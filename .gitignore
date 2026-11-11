@@ -13,6 +13,7 @@ snapshots/0*/
 
 # scorer output
 results/
+debug/
 
 # os
 .DS_Store
