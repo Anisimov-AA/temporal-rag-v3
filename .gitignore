@@ -1,0 +1,19 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# secrets
+.env
+
+# data
+snapshots_zip/
+snapshots/0*/
+*.pdf
+
+# scorer output
+results/
+
+# os
+.DS_Store
+project_map.html
