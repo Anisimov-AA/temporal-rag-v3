@@ -62,7 +62,17 @@ def remove_markdown_noise(text):
     return ESCAPED.sub(r"\1", text)
 
 
+def keep_table_rows(text):
+    lines = []
+    for line in text.split("\n"):
+        if line.lstrip().startswith("|"):
+            line = LINE_BREAK.sub(" ", WRITTEN_NEWLINE.sub(" ", line))
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def remove_html_noise(text):
+    text = keep_table_rows(text)
     text = WRITTEN_NEWLINE.sub("\n", text)
     text = SHORTCODE.sub("", text)
     text = COMMENT.sub("", text)
