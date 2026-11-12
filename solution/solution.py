@@ -15,6 +15,7 @@ CLEAN_STEPS = [
     "repeated_lines",
     "tidy",
     "head",
+    "app_pages",
     "empty_pages",
     "copies",
 ]

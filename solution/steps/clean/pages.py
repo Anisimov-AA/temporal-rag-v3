@@ -1,9 +1,11 @@
 import re
 from datetime import datetime
+from urllib.parse import urlparse
 
 from langchain_core.documents import Document
 
 MIN_WORDS = 10
+APP_PAGES = ("/subscription-preferences", "/mobile/eNotifiers")
 TITLE = re.compile(r"^# ")
 DATE = re.compile(r"^[A-Z][a-z]{2,8}\.? \d{1,2}, \d{4}$")
 BYLINE = re.compile(r"^Written by .*\| ([A-Z][a-z]{2,8}\.? \d{1,2}, \d{4})")
@@ -68,6 +70,10 @@ def own_words(text):
             continue
         count += len(WORD.findall(ADDRESS.sub("", s)))
     return count
+
+
+def drop_app_pages(docs):
+    return [doc for doc in docs if not urlparse(doc.metadata["url"]).path.startswith(APP_PAGES)]
 
 
 def drop_empty_pages(docs):
