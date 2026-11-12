@@ -5,6 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "harness"))
 from contract import Answer, Snapshot  # noqa: E402
 from steps.clean import clean  # noqa: E402
 from steps.load import to_documents  # noqa: E402
+from steps.split import split_into_chunks  # noqa: E402
 
 CLEAN_STEPS = [
     "images",
@@ -23,14 +24,16 @@ CLEAN_STEPS = [
 
 class Knowledge:
     def __init__(self):
-        self.docs = {}
+        self.chunks = {}
 
     def ingest(self, snapshot: Snapshot):
         loaded = to_documents(snapshot)
         cleaned = clean(loaded, CLEAN_STEPS)
-        self.docs[snapshot.snapshot_id] = cleaned
+        chunks = split_into_chunks(cleaned)
+        self.chunks[snapshot.snapshot_id] = chunks
         print(
-            f"{snapshot.snapshot_id}: {len(loaded)} pages loaded, {len(cleaned)} after cleaning"
+            f"{snapshot.snapshot_id}: {len(loaded)} pages loaded, "
+            f"{len(cleaned)} after cleaning, {len(chunks)} chunks"
         )
 
     def answer(self, question, as_of=None):
