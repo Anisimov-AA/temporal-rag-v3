@@ -20,6 +20,7 @@ CLEAN_STEPS = [
     "empty_pages",
     "copies",
 ]
+CHUNK_SIZE = 4000
 
 
 class Knowledge:
@@ -29,7 +30,7 @@ class Knowledge:
     def ingest(self, snapshot: Snapshot):
         loaded = to_documents(snapshot)
         cleaned = clean(loaded, CLEAN_STEPS)
-        chunks = split_into_chunks(cleaned)
+        chunks = split_into_chunks(cleaned, CHUNK_SIZE)
         self.chunks[snapshot.snapshot_id] = chunks
         print(
             f"{snapshot.snapshot_id}: {len(loaded)} pages loaded, "
