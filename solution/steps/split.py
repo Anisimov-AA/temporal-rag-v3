@@ -11,6 +11,7 @@ CAPTION = re.compile(r"^[^.!?:|#]{1,60}$")
 TABLE_ROW = re.compile(r"^\s*\|")
 TABLE_LINE = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 CAPTION_LINES = 2
+TINY = 100
 
 
 def has_text(lines):
@@ -127,6 +128,33 @@ def cut_long_unit(text, size):
     return glue(pieces, size)
 
 
+def same_page(a, b):
+    return a.metadata["url"] == b.metadata["url"]
+
+
+def joined(first, second, metadata):
+    text = first.page_content + "\n\n" + second.page_content
+    return Document(page_content=text, metadata=metadata)
+
+
+def glue_tiny(chunks):
+    forward = []
+    for chunk in chunks:
+        last = forward[-1] if forward else None
+        if last and same_page(last, chunk) and len(last.page_content) < TINY:
+            forward[-1] = joined(last, chunk, chunk.metadata)
+        else:
+            forward.append(chunk)
+    glued = []
+    for chunk in forward:
+        last = glued[-1] if glued else None
+        if last and same_page(last, chunk) and len(chunk.page_content) < TINY:
+            glued[-1] = joined(last, chunk, last.metadata)
+        else:
+            glued.append(chunk)
+    return glued
+
+
 def split_into_chunks(docs, size):
     chunks = []
     for doc in docs:
@@ -137,4 +165,4 @@ def split_into_chunks(docs, size):
             for unit in split_into_units(section.page_content):
                 for piece in cut_long_unit(unit, size) if len(unit) > size else [unit]:
                     chunks.append(Document(page_content=piece, metadata=section.metadata))
-    return chunks
+    return glue_tiny(chunks)
