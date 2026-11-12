@@ -19,6 +19,9 @@ STEPS = [
     "blocks",
     "repeated_lines",
     "tidy",
+    "head",
+    "empty_pages",
+    "copies",
 ]
 EVAL = ROOT / "eval" / "public_eval.jsonl"
 SHOW = 60

@@ -6,6 +6,7 @@ from steps.clean.inline import (
     remove_images,
     remove_markdown_noise,
 )
+from steps.clean.pages import drop_copies, drop_empty_pages, move_head
 from steps.clean.repeated_lines import remove_repeated_lines
 from steps.clean.tidy import tidy
 
@@ -28,6 +29,9 @@ CLEANERS = {
     "blocks": remove_blocks,
     "repeated_lines": remove_repeated_lines,
     "tidy": each_page(tidy),
+    "head": move_head,
+    "empty_pages": drop_empty_pages,
+    "copies": drop_copies,
 }
 
 
