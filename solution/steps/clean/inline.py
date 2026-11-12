@@ -1,3 +1,4 @@
+import html
 import re
 from urllib.parse import urlparse
 
@@ -18,6 +19,12 @@ FENCE = re.compile(r"(?m)^\s*```.*$")
 DIVIDER = re.compile(r"(?m)^\s*([-*_])(\s*\1){2,}\s*$")
 LINE_END = re.compile(r"(?m)\\+\s*$")
 ESCAPED = re.compile(r"\\([*_\[\]()`~!])")
+
+WRITTEN_NEWLINE = re.compile(r"\\{1,2}r\\{1,2}n")
+SHORTCODE = re.compile(r"\\?\[/?vc\\?_[^\]\n]*\\?\]")
+COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+LINE_BREAK = re.compile(r"<br\s*/?>", re.IGNORECASE)
+TAG = re.compile(r"</?[a-zA-Z][^>]*>")
 
 
 def remove_images(text):
@@ -53,3 +60,12 @@ def remove_markdown_noise(text):
     text = DIVIDER.sub("", text)
     text = LINE_END.sub("", text)
     return ESCAPED.sub(r"\1", text)
+
+
+def remove_html_noise(text):
+    text = WRITTEN_NEWLINE.sub("\n", text)
+    text = SHORTCODE.sub("", text)
+    text = COMMENT.sub("", text)
+    text = LINE_BREAK.sub("\n", text)
+    text = TAG.sub("", text)
+    return html.unescape(html.unescape(text))
