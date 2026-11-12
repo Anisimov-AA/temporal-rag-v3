@@ -11,7 +11,15 @@ from scoring import _norm, _numbers  # noqa: E402
 from steps.clean import CLEANERS  # noqa: E402
 from steps.load import to_documents  # noqa: E402
 
-STEPS = ["images", "links", "markdown_noise", "html_noise", "blocks", "repeated_lines"]
+STEPS = [
+    "images",
+    "links",
+    "markdown_noise",
+    "html_noise",
+    "blocks",
+    "repeated_lines",
+    "tidy",
+]
 EVAL = ROOT / "eval" / "public_eval.jsonl"
 SHOW = 60
 

@@ -7,6 +7,7 @@ from steps.clean.inline import (
     remove_markdown_noise,
 )
 from steps.clean.repeated_lines import remove_repeated_lines
+from steps.clean.tidy import tidy
 
 
 def each_page(fix):
@@ -26,6 +27,7 @@ CLEANERS = {
     "html_noise": each_page(remove_html_noise),
     "blocks": remove_blocks,
     "repeated_lines": remove_repeated_lines,
+    "tidy": each_page(tidy),
 }
 
 
