@@ -3,7 +3,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "harness"))
 from contract import Answer, Snapshot  # noqa: E402
+from steps.clean import clean  # noqa: E402
 from steps.load import to_documents  # noqa: E402
+
+CLEAN_STEPS = [
+    "images",
+    "links",
+    "markdown_noise",
+    "html_noise",
+    "blocks",
+    "repeated_lines",
+    "tidy",
+    "head",
+    "empty_pages",
+    "copies",
+]
 
 
 class Knowledge:
@@ -11,9 +25,11 @@ class Knowledge:
         self.docs = {}
 
     def ingest(self, snapshot: Snapshot):
-        self.docs[snapshot.snapshot_id] = to_documents(snapshot)
+        loaded = to_documents(snapshot)
+        cleaned = clean(loaded, CLEAN_STEPS)
+        self.docs[snapshot.snapshot_id] = cleaned
         print(
-            f"loaded {snapshot.snapshot_id}: {len(self.docs[snapshot.snapshot_id])} documents"
+            f"{snapshot.snapshot_id}: {len(loaded)} pages loaded, {len(cleaned)} after cleaning"
         )
 
     def answer(self, question, as_of=None):
