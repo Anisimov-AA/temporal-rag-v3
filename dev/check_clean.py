@@ -11,13 +11,17 @@ from scoring import _norm, _numbers  # noqa: E402
 from steps.clean import CLEANERS  # noqa: E402
 from steps.load import to_documents  # noqa: E402
 
-STEPS = ["images"]
+STEPS = ["images", "links"]
 EVAL = ROOT / "eval" / "public_eval.jsonl"
 SHOW = 60
 
 
 def answer_values():
-    questions = [json.loads(line) for line in EVAL.read_text(encoding="utf-8").splitlines() if line.strip()]
+    questions = [
+        json.loads(line)
+        for line in EVAL.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     return sorted({value for q in questions for value in q["must_include"]})
 
 
@@ -28,7 +32,10 @@ def is_number(value):
 
 def has(text, numbers, value):
     if is_number(value):
-        return all(n in numbers or (n[0] == "" and any(a[1] == n[1] for a in numbers)) for n in _numbers(value))
+        return all(
+            n in numbers or (n[0] == "" and any(a[1] == n[1] for a in numbers))
+            for n in _numbers(value)
+        )
     return _norm(value) in text
 
 
@@ -44,7 +51,7 @@ def where(docs, values):
 
 def around(before, after, value):
     for match in re.finditer(re.escape(value), before, re.IGNORECASE):
-        piece = before[max(0, match.start() - SHOW):match.end() + SHOW]
+        piece = before[max(0, match.start() - SHOW) : match.end() + SHOW]
         if piece not in after:
             return " ".join(piece.split())
     return ""
@@ -68,16 +75,26 @@ def main():
             after = where(docs, values)
             for value in values:
                 for url in sorted(before[value] - after[value]):
-                    loss = losses[step].setdefault((value, url), {"downloads": [], "was": around(old[url], new.get(url, ""), value)})
+                    loss = losses[step].setdefault(
+                        (value, url),
+                        {
+                            "downloads": [],
+                            "was": around(old[url], new.get(url, ""), value),
+                        },
+                    )
                     loss["downloads"].append(snapshot.taken_on[5:])
             before = after
     for step in STEPS:
         print(f"\n{step}: {len(losses[step])} lost")
         for (value, url), loss in losses[step].items():
-            print(f"  {value!r} gone from {name(url)}   in {', '.join(loss['downloads'])}")
+            print(
+                f"  {value!r} gone from {name(url)}   in {', '.join(loss['downloads'])}"
+            )
             print(f"    was: ...{loss['was']}...")
     total = sum(len(found) for found in losses.values())
-    print(f"\n{'OK, nothing lost' if total == 0 else 'read each one: is it real text or only an address or code?'}")
+    print(
+        f"\n{'OK, nothing lost' if total == 0 else 'read each one: is it real text or only an address or code?'}"
+    )
 
 
 if __name__ == "__main__":

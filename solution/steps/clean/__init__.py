@@ -1,5 +1,5 @@
 from langchain_core.documents import Document
-from steps.clean.inline import remove_images
+from steps.clean.inline import links_to_text, remove_images
 
 
 def each_page(fix):
@@ -14,6 +14,7 @@ def each_page(fix):
 
 CLEANERS = {
     "images": each_page(remove_images),
+    "links": each_page(links_to_text),
 }
 
 
