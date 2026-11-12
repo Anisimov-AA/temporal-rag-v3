@@ -1,6 +1,7 @@
 import re
 
 from langchain_core.documents import Document
+from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 
 HEADING = re.compile(r"^(#{1,2}) (.*)")
 ANY_HEADING = re.compile(r"^#{1,6} ")
@@ -8,6 +9,7 @@ SUBHEADING = re.compile(r"^#{3,6} ")
 QUESTION = re.compile(r"^[-*] .+\?$")
 CAPTION = re.compile(r"^[^.!?:|#]{1,60}$")
 TABLE_ROW = re.compile(r"^\s*\|")
+TABLE_LINE = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 CAPTION_LINES = 2
 
 
@@ -78,6 +80,53 @@ def split_into_units(text):
     return ["\n".join(unit).strip() for unit in units if "\n".join(unit).strip()]
 
 
+def tables_and_text(text):
+    parts, lines = [], []
+    for line in text.splitlines():
+        if lines and bool(TABLE_ROW.match(line)) != bool(TABLE_ROW.match(lines[-1])):
+            parts.append(lines)
+            lines = []
+        lines.append(line)
+    parts.append(lines)
+    return parts
+
+
+def cut_table(rows, size):
+    header = rows[:2] if len(rows) > 1 and TABLE_LINE.match(rows[1]) else rows[:1]
+    pieces, piece = [], list(header)
+    for row in rows[len(header):]:
+        if len(piece) > len(header) and len("\n".join(piece + [row])) > size:
+            pieces.append("\n".join(piece))
+            piece = list(header)
+        piece.append(row)
+    pieces.append("\n".join(piece))
+    return pieces
+
+
+def glue(pieces, size):
+    glued = []
+    for piece in pieces:
+        fits = glued and len(glued[-1]) + 1 + len(piece) <= size
+        if glued and (fits or not has_text(glued[-1].splitlines())):
+            glued[-1] += "\n" + piece
+        else:
+            glued.append(piece)
+    return glued
+
+
+def cut_long_unit(text, size):
+    splitter = RecursiveCharacterTextSplitter.from_language(
+        Language.MARKDOWN, chunk_size=size, chunk_overlap=0
+    )
+    pieces = []
+    for lines in tables_and_text(text):
+        if TABLE_ROW.match(lines[0]):
+            pieces += cut_table(lines, size)
+        elif "\n".join(lines).strip():
+            pieces += splitter.split_text("\n".join(lines))
+    return glue(pieces, size)
+
+
 def split_into_chunks(docs, size):
     chunks = []
     for doc in docs:
@@ -86,5 +135,6 @@ def split_into_chunks(docs, size):
                 chunks.append(section)
                 continue
             for unit in split_into_units(section.page_content):
-                chunks.append(Document(page_content=unit, metadata=section.metadata))
+                for piece in cut_long_unit(unit, size) if len(unit) > size else [unit]:
+                    chunks.append(Document(page_content=piece, metadata=section.metadata))
     return chunks
