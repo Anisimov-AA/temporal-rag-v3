@@ -4,6 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "harness"))
 from contract import Answer, Snapshot  # noqa: E402
 from steps.clean import clean  # noqa: E402
+from steps.index import EMBEDDINGS, build_index  # noqa: E402
 from steps.load import to_documents  # noqa: E402
 from steps.split import split_into_chunks  # noqa: E402
 
@@ -21,20 +22,25 @@ CLEAN_STEPS = [
     "copies",
 ]
 CHUNK_SIZE = 4000
+EMBEDDING = "bge-m3"
+INDEX_DIR = Path(__file__).resolve().parents[1] / "index"
 
 
 class Knowledge:
     def __init__(self):
-        self.chunks = {}
+        self.embeddings = EMBEDDINGS[EMBEDDING]()
+        self.stores = {}
 
     def ingest(self, snapshot: Snapshot):
         loaded = to_documents(snapshot)
         cleaned = clean(loaded, CLEAN_STEPS)
         chunks = split_into_chunks(cleaned, CHUNK_SIZE)
-        self.chunks[snapshot.snapshot_id] = chunks
+        name = f"{snapshot.snapshot_id}__{EMBEDDING}"
+        store, how = build_index(chunks, name, self.embeddings, INDEX_DIR)
+        self.stores[snapshot.snapshot_id] = store
         print(
             f"{snapshot.snapshot_id}: {len(loaded)} pages loaded, "
-            f"{len(cleaned)} after cleaning, {len(chunks)} chunks"
+            f"{len(cleaned)} after cleaning, {len(chunks)} chunks, index {how}"
         )
 
     def answer(self, question, as_of=None):
