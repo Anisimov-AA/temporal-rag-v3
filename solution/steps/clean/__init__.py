@@ -6,6 +6,7 @@ from steps.clean.inline import (
     remove_images,
     remove_markdown_noise,
 )
+from steps.clean.repeated_lines import remove_repeated_lines
 
 
 def each_page(fix):
@@ -24,6 +25,7 @@ CLEANERS = {
     "markdown_noise": each_page(remove_markdown_noise),
     "html_noise": each_page(remove_html_noise),
     "blocks": remove_blocks,
+    "repeated_lines": remove_repeated_lines,
 }
 
 

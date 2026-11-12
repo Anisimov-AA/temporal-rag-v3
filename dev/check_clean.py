@@ -11,13 +11,7 @@ from scoring import _norm, _numbers  # noqa: E402
 from steps.clean import CLEANERS  # noqa: E402
 from steps.load import to_documents  # noqa: E402
 
-STEPS = [
-    "images",
-    "links",
-    "markdown_noise",
-    "html_noise",
-    "blocks",
-]
+STEPS = ["images", "links", "markdown_noise", "html_noise", "blocks", "repeated_lines"]
 EVAL = ROOT / "eval" / "public_eval.jsonl"
 SHOW = 60
 
@@ -95,7 +89,9 @@ def main():
             before = after
     for step in STEPS:
         gone = sorted(site_losses[step])
-        print(f"\n{step}: {len(losses[step])} lost from a page · gone from the whole site: {gone if gone else 'nothing'}")
+        print(
+            f"\n{step}: {len(losses[step])} lost from a page · gone from the whole site: {gone if gone else 'nothing'}"
+        )
         for (value, url), loss in losses[step].items():
             print(
                 f"  {value!r} gone from {name(url)}   in {', '.join(loss['downloads'])}"
