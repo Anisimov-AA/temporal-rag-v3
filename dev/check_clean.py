@@ -11,7 +11,13 @@ from scoring import _norm, _numbers  # noqa: E402
 from steps.clean import CLEANERS  # noqa: E402
 from steps.load import to_documents  # noqa: E402
 
-STEPS = ["images", "links", "markdown_noise", "html_noise"]
+STEPS = [
+    "images",
+    "links",
+    "markdown_noise",
+    "html_noise",
+    "blocks",
+]
 EVAL = ROOT / "eval" / "public_eval.jsonl"
 SHOW = 60
 
@@ -65,6 +71,7 @@ def main():
     values = answer_values()
     print(f"{len(values)} answer values, steps: {' → '.join(STEPS)}")
     losses = {step: {} for step in STEPS}
+    site_losses = {step: set() for step in STEPS}
     for snapshot in load_snapshots(ROOT / "snapshots"):
         docs = to_documents(snapshot)
         before = where(docs, values)
@@ -83,9 +90,12 @@ def main():
                         },
                     )
                     loss["downloads"].append(snapshot.taken_on[5:])
+                if before[value] and not after[value]:
+                    site_losses[step].add((value, snapshot.taken_on[5:]))
             before = after
     for step in STEPS:
-        print(f"\n{step}: {len(losses[step])} lost")
+        gone = sorted(site_losses[step])
+        print(f"\n{step}: {len(losses[step])} lost from a page · gone from the whole site: {gone if gone else 'nothing'}")
         for (value, url), loss in losses[step].items():
             print(
                 f"  {value!r} gone from {name(url)}   in {', '.join(loss['downloads'])}"

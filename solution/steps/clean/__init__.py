@@ -1,4 +1,5 @@
 from langchain_core.documents import Document
+from steps.clean.blocks import remove_blocks
 from steps.clean.inline import (
     links_to_text,
     remove_html_noise,
@@ -22,6 +23,7 @@ CLEANERS = {
     "links": each_page(links_to_text),
     "markdown_noise": each_page(remove_markdown_noise),
     "html_noise": each_page(remove_html_noise),
+    "blocks": remove_blocks,
 }
 
 
