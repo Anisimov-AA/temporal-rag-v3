@@ -16,6 +16,10 @@ TEASER_CLOSER = re.compile(r"^((get|read|see)( the)? (more|all)\b|keep reading)"
 FIELD = re.compile(r"^(?!\|)[A-Z][^|]{0,90}(\*|\(Required\)\*?)$")
 SUBMIT = re.compile(r"^(Previous)?Submit$")
 PROMISE = re.compile(r"^We[’']ll only use your information")
+INTRO_LINES = 4
+WIDGET_LINES = 4
+WIDGET_TITLE = re.compile(r"^(?![-*#|])(?!.*\.$)[^!:|()]{2,40}$")
+TITLE_LIKE = re.compile(r"^(?![-*#|])[^.!:|()]{2,40}$")
 LOCATOR = re.compile(r"^With \d+ miles$")
 RESULTS = re.compile(r"^\d+ Results$")
 ZOOM = "### Zoom in"
@@ -26,6 +30,7 @@ CALC_END = re.compile(
     r"|Title, and other taxes and fees are not included"
     r"|This material is provided for general and educational purposes)"
 )
+CALC_TAIL = re.compile(r"^(powered by\b|Disclosure$)")
 CALC_INPUT = re.compile(r"^(\$[\d,.]*|\d+ months)$")
 LABEL = re.compile(r"^(?!#)[^.!?|]{1,40}$")
 DOUBLED = re.compile(r"^[^|#].{0,59}$")
@@ -80,13 +85,30 @@ def find_blocks(lines):
         start = lines[i].strip().lower()
         if start in MARKERS:
             last = block_end(lines, i, MARKERS[start])
-            spans.append((form_start(lines, i), last))
+            spans.append((i, last))
             i = last
         i += 1
     return spans
 
 
+def form_heading(lines, first):
+    k, seen, title = first - 1, 0, None
+    while k >= 0 and seen < INTRO_LINES:
+        line = lines[k].strip()
+        if level(line):
+            return k if level(line) > 1 else title
+        if line:
+            seen += 1
+            if TITLE_LIKE.match(line):
+                title = k
+        k -= 1
+    return title
+
+
 def form_start(lines, first):
+    heading = form_heading(lines, first)
+    if heading is not None:
+        return heading
     start, k = first, first - 1
     while k >= 0 and (not lines[k].strip() or LABEL.match(lines[k].strip())):
         if lines[k].strip():
@@ -147,6 +169,16 @@ def is_input(rows, n):
     return bool(doubled or CALC_INPUT.match(rows[n]))
 
 
+def widget_title(rows, first, start):
+    title = None
+    for k in range(first - 1, max(start, first - WIDGET_LINES) - 1, -1):
+        if level(rows[k]):
+            break
+        if WIDGET_TITLE.match(rows[k]):
+            title = k
+    return title
+
+
 def find_calculators(lines):
     spans = []
     full = [i for i, line in enumerate(lines) if line.strip()]
@@ -157,12 +189,14 @@ def find_calculators(lines):
             n += 1
             continue
         end = n
-        while end + 1 < len(rows) and CALC_END.search(rows[end + 1]):
+        while end + 1 < len(rows) and (CALC_END.search(rows[end + 1]) or CALC_TAIL.match(rows[end + 1])):
             end += 1
         first = next((k for k in range(start, n) if is_input(rows, k)), None)
         if first is not None:
             while first > start and LABEL.match(rows[first - 1]):
                 first -= 1
+            title = widget_title(rows, first, start)
+            first = first if title is None else title
             spans.append((full[first], full[end]))
         start = n = end + 1
     return spans

@@ -38,7 +38,7 @@ def read_head(text):
     published = None
     kept = []
     for i, line in enumerate(lines):
-        byline = BYLINE.match(line)
+        byline = BYLINE.match(line.strip())
         if byline:
             published = published or to_iso(byline.group(1))
         elif i < title and DATE.match(line):
