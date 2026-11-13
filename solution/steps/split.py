@@ -107,8 +107,7 @@ def cut_table(rows, size):
 def glue(pieces, size):
     glued = []
     for piece in pieces:
-        fits = glued and len(glued[-1]) + 1 + len(piece) <= size
-        if glued and (fits or not has_text(glued[-1].splitlines())):
+        if glued and len(glued[-1]) + 1 + len(piece) <= size:
             glued[-1] += "\n" + piece
         else:
             glued.append(piece)
