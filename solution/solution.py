@@ -5,47 +5,55 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "harness"))
 from contract import Answer, Snapshot, Source  # noqa: E402
 from steps.answer import DONT_KNOW, GAPS, LLMS, ask  # noqa: E402
 from steps.clean import clean  # noqa: E402
-from steps.index import EMBEDDINGS, build_index, index_docs  # noqa: E402
+from steps.index import EMBEDDINGS, build_index, fingerprint, index_docs  # noqa: E402
 from steps.load import to_documents  # noqa: E402
 from steps.search import Keywords, fuse  # noqa: E402
 from steps.split import split_into_chunks  # noqa: E402
 
-CLEAN_STEPS = [
-    "images",
-    "links",
-    "markdown_noise",
-    "html_noise",
-    "blocks",
-    "repeated_lines",
-    "tidy",
-    "head",
-    "app_pages",
-    "empty_pages",
-    "copies",
-]
-CHUNK_SIZE = 4000
-EMBEDDING = "bge-m3"
 INDEX_DIR = Path(__file__).resolve().parents[1] / "index"
-CANDIDATES = 20
-TOP_K = 10
-LLM = "llama3.1:8b"
-PROMPT = "plain"
+SPLITS = {"sections": split_into_chunks}
+SEARCHES = ("vectors + bm25", "vectors", "bm25")
+CONFIG = {
+    "clean": [
+        "images",
+        "links",
+        "markdown_noise",
+        "html_noise",
+        "blocks",
+        "repeated_lines",
+        "tidy",
+        "head",
+        "app_pages",
+        "empty_pages",
+        "copies",
+    ],
+    "split": "sections",
+    "chunk_size": 4000,
+    "embedding": "bge-m3",
+    "search": "vectors + bm25",
+    "candidates": 20,
+    "top_k": 10,
+    "llm": "llama3.1:8b",
+    "prompt": "plain",
+}
 
 
 class Knowledge:
-    def __init__(self):
-        self.embeddings = EMBEDDINGS[EMBEDDING]()
-        self.llm = LLMS[LLM]()
+    def __init__(self, config=None):
+        self.config = config or CONFIG
+        self.embeddings = EMBEDDINGS[self.config["embedding"]]()
+        self.llm = LLMS[self.config["llm"]]()
         self.stores = {}
         self.keywords = {}
         self.dates = {}
 
     def ingest(self, snapshot: Snapshot):
+        c = self.config
         loaded = to_documents(snapshot)
-        cleaned = clean(loaded, CLEAN_STEPS)
-        chunks = split_into_chunks(cleaned, CHUNK_SIZE)
-        name = f"{snapshot.snapshot_id}__{EMBEDDING}"
+        cleaned = clean(loaded, c["clean"])
+        chunks = SPLITS[c["split"]](cleaned, c["chunk_size"])
         docs = index_docs(chunks)
+        name = f"{snapshot.snapshot_id}__{c['embedding']}__{fingerprint(docs)}"
         store, how = build_index(docs, name, self.embeddings, INDEX_DIR)
         self.stores[snapshot.snapshot_id] = store
         self.keywords[snapshot.snapshot_id] = Keywords(docs)
@@ -56,9 +64,13 @@ class Knowledge:
         )
 
     def search(self, question, snapshot_id):
-        by_meaning = self.stores[snapshot_id].similarity_search(question, k=CANDIDATES)
-        by_words = self.keywords[snapshot_id].search(question, CANDIDATES)
-        return fuse([by_meaning, by_words])[:TOP_K]
+        c = self.config
+        lists = []
+        if c["search"] in ("vectors + bm25", "vectors"):
+            lists.append(self.stores[snapshot_id].similarity_search(question, k=c["candidates"]))
+        if c["search"] in ("vectors + bm25", "bm25"):
+            lists.append(self.keywords[snapshot_id].search(question, c["candidates"]))
+        return fuse(lists)[: c["top_k"]]
 
     def pick(self, as_of):
         days = {sid: day for sid, day in self.dates.items() if as_of is None or day <= as_of}
@@ -67,7 +79,7 @@ class Knowledge:
     def answer(self, question, as_of=None):
         snapshot_id = self.pick(as_of)
         chunks = self.search(question, snapshot_id)
-        reply = ask(self.llm, GAPS[LLM], PROMPT, question, chunks)
+        reply = ask(self.llm, GAPS[self.config["llm"]], self.config["prompt"], question, chunks)
         if not reply.known:
             return Answer(text=DONT_KNOW, confident=False)
         used = chunks[reply.source - 1] if 1 <= reply.source <= len(chunks) else chunks[0]
@@ -77,5 +89,5 @@ class Knowledge:
         return []
 
 
-def build():
-    return Knowledge()
+def build(config=None):
+    return Knowledge(config)

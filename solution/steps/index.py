@@ -35,6 +35,11 @@ def doc_ids(docs):
     return ids
 
 
+def fingerprint(docs):
+    joined = "".join(sorted(doc.id for doc in docs))
+    return hashlib.sha1(joined.encode("utf-8")).hexdigest()[:8]
+
+
 def index_docs(chunks):
     docs = [Document(page_content=search_text(c), metadata=plain(c.metadata)) for c in chunks]
     for doc, doc_id in zip(docs, doc_ids(docs)):
