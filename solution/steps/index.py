@@ -35,9 +35,15 @@ def doc_ids(docs):
     return ids
 
 
-def build_index(chunks, name, embeddings, folder):
+def index_docs(chunks):
     docs = [Document(page_content=search_text(c), metadata=plain(c.metadata)) for c in chunks]
-    ids = doc_ids(docs)
+    for doc, doc_id in zip(docs, doc_ids(docs)):
+        doc.id = doc_id
+    return docs
+
+
+def build_index(docs, name, embeddings, folder):
+    ids = [doc.id for doc in docs]
     store = Chroma(collection_name=name, embedding_function=embeddings, persist_directory=str(folder))
     if set(store.get(include=[])["ids"]) == set(ids):
         return store, "reused"
