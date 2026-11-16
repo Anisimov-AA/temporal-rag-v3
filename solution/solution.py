@@ -5,8 +5,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "harness"))
 from contract import Answer, Snapshot, Source  # noqa: E402
 from steps.answer import DONT_KNOW, GAPS, LLMS, ask, with_value  # noqa: E402
 from steps.clean import clean  # noqa: E402
+from steps.conflicts import find_conflicts  # noqa: E402
 from steps.index import EMBEDDINGS, build_index, fingerprint, index_docs  # noqa: E402
 from steps.load import to_documents  # noqa: E402
+from steps.rates import rate_table  # noqa: E402
 from steps.search import Keywords, fuse, rerank  # noqa: E402
 from steps.split import split_into_chunks  # noqa: E402
 
@@ -47,10 +49,12 @@ class Knowledge:
         self.stores = {}
         self.keywords = {}
         self.dates = {}
+        self.rates = []
 
     def ingest(self, snapshot: Snapshot):
         c = self.config
         loaded = to_documents(snapshot)
+        self.rates += rate_table(loaded)
         cleaned = clean(loaded, c["clean"])
         chunks = SPLITS[c["split"]](cleaned, c["chunk_size"])
         docs = index_docs(chunks)
@@ -94,7 +98,7 @@ class Knowledge:
         return Answer(text=reply.answer, sources=[Source(url=u, snapshot_id=snapshot_id) for u in urls])
 
     def conflicts(self):
-        return []
+        return find_conflicts(self.rates)
 
 
 def build(config=None):
