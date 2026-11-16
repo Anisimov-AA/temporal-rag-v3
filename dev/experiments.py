@@ -54,6 +54,8 @@ CONFIGS = {
                  "about": "16 + today is the date of the download"},
     "20_max": {**BASE, "base": "16_sources", "prompt": "max", "search": "vectors + bm25 + rerank", "top_k": 5, "sources": "with_value",
                "about": "16 + every rule that helped Opus: strict, looking for, quote, two examples, newest, combine, today"},
+    "21_quote_rerank": {**BASE, "base": "16_sources", "prompt": "quote", "search": "vectors + bm25 + rerank", "top_k": 5, "sources": "with_value",
+                        "about": "16 with the prompt of 06 (strict, looking for, quote)"},
 }
 
 
