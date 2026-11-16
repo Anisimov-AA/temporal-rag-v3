@@ -87,7 +87,7 @@ class Knowledge:
     def answer(self, question, as_of=None):
         snapshot_id = self.pick(as_of)
         chunks = self.search(question, snapshot_id)
-        reply = ask(self.llm, GAPS[self.config["llm"]], self.config["prompt"], question, chunks)
+        reply = ask(self.llm, GAPS[self.config["llm"]], self.config["prompt"], question, chunks, self.dates[snapshot_id])
         if not reply.known:
             return Answer(text=DONT_KNOW, confident=False)
         used = chunks[reply.source - 1] if 1 <= reply.source <= len(chunks) else chunks[0]

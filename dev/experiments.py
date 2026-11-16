@@ -46,6 +46,14 @@ CONFIGS = {
     "15_plain_rerank_5": {**BASE, "base": "01_plain", "search": "vectors + bm25 + rerank", "top_k": 5, "about": "01 + rerank, the first 5 (13 without the closest rule)"},
     "16_sources": {**BASE, "base": "13_rerank_5", "prompt": "closest", "search": "vectors + bm25 + rerank", "top_k": 5, "sources": "with_value",
                    "about": "13 + the sources: every chunk with a value from the answer, not only the one the model names"},
+    "17_newest": {**BASE, "base": "16_sources", "prompt": "newest", "search": "vectors + bm25 + rerank", "top_k": 5, "sources": "with_value",
+                  "about": "16 + if the excerpts disagree, trust the newest date and say what changed"},
+    "18_combine": {**BASE, "base": "16_sources", "prompt": "combine", "search": "vectors + bm25 + rerank", "top_k": 5, "sources": "with_value",
+                   "about": "16 + build the answer from every excerpt that has a part of it"},
+    "19_today": {**BASE, "base": "16_sources", "prompt": "today", "search": "vectors + bm25 + rerank", "top_k": 5, "sources": "with_value",
+                 "about": "16 + today is the date of the download"},
+    "20_max": {**BASE, "base": "16_sources", "prompt": "max", "search": "vectors + bm25 + rerank", "top_k": 5, "sources": "with_value",
+               "about": "16 + every rule that helped Opus: strict, looking for, quote, two examples, newest, combine, today"},
 }
 
 
@@ -135,7 +143,8 @@ def load_contexts(config):
 
 
 def prompt(config, context):
-    return PROMPTS[CONFIGS[config]["prompt"]].format(excerpts=context["excerpts"], question=context["question"])
+    today = context["snapshot_id"].split("_")[1]
+    return PROMPTS[CONFIGS[config]["prompt"]].format(excerpts=context["excerpts"], question=context["question"], today=today)
 
 
 def to_answer(r, context, sources="one"):

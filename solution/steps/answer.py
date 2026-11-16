@@ -108,9 +108,19 @@ ONLY_LOOKING_FOR = plain_plus("First write what the member wants, in a few words
 ONLY_QUOTE = plain_plus("Copy the exact words of the excerpts that give the answer (quote), or \"\" if none do.\n", '"quote": …, ')
 ONLY_FEW_SHOT = PLAIN.replace("Website excerpts:\n", EXAMPLES + "Website excerpts:\n", 1)
 
+NEWEST = CLOSEST.replace(TOP, TOP + "If the excerpts disagree, trust the one with the newest date and say what changed.\n", 1)
+COMBINE = CLOSEST.replace(TOP, TOP + "Build the answer from every excerpt that has a part of it, not from one excerpt only.\n", 1)
+TODAY = CLOSEST.replace(TOP, TOP + "Today is {today}.\n", 1)
+
+MAX = (QUOTE.replace(TOP, TOP + "Today is {today}.\n"
+                         "If the excerpts disagree, trust the one with the newest date and say what changed.\n"
+                         "Build the answer from every excerpt that has a part of it, not from one excerpt only.\n", 1)
+       .replace("Website excerpts:\n", EXAMPLES + "Website excerpts:\n", 1))
+
 PROMPTS = {"plain": PLAIN, "chain_of_thought": CHAIN_OF_THOUGHT, "site_words": SITE_WORDS, "closest": CLOSEST,
            "closest_strict": CLOSEST_STRICT, "looking_for": LOOKING_FOR, "quote": QUOTE, "few_shot": FEW_SHOT,
-           "only_strict": ONLY_STRICT, "only_looking_for": ONLY_LOOKING_FOR, "only_quote": ONLY_QUOTE, "only_few_shot": ONLY_FEW_SHOT}
+           "only_strict": ONLY_STRICT, "only_looking_for": ONLY_LOOKING_FOR, "only_quote": ONLY_QUOTE, "only_few_shot": ONLY_FEW_SHOT,
+           "newest": NEWEST, "combine": COMBINE, "today": TODAY, "max": MAX}
 
 
 class Reply(BaseModel):
@@ -164,6 +174,6 @@ def reply(llm, gap, prompt):
     return Reply(**(llm | JsonOutputParser()).invoke(prompt))
 
 
-def ask(llm, gap, prompt_name, question, chunks):
-    prompt = PROMPTS[prompt_name].format(excerpts=excerpts(chunks), question=question)
+def ask(llm, gap, prompt_name, question, chunks, today=""):
+    prompt = PROMPTS[prompt_name].format(excerpts=excerpts(chunks), question=question, today=today)
     return reply(llm, gap, prompt)
