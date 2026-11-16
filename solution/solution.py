@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "harness"))
 from contract import Answer, Snapshot, Source  # noqa: E402
-from steps.answer import DONT_KNOW, GAPS, LLMS, ask  # noqa: E402
+from steps.answer import DONT_KNOW, GAPS, LLMS, ask, with_value  # noqa: E402
 from steps.clean import clean  # noqa: E402
 from steps.index import EMBEDDINGS, build_index, fingerprint, index_docs  # noqa: E402
 from steps.load import to_documents  # noqa: E402
@@ -35,6 +35,7 @@ CONFIG = {
     "top_k": 5,
     "llm": "gcp:qwen3:30b-a3b",
     "prompt": "closest",
+    "sources": "with_value",
 }
 
 
@@ -86,7 +87,11 @@ class Knowledge:
         if not reply.known:
             return Answer(text=DONT_KNOW, confident=False)
         used = chunks[reply.source - 1] if 1 <= reply.source <= len(chunks) else chunks[0]
-        return Answer(text=reply.answer, sources=[Source(url=used.metadata["url"], snapshot_id=snapshot_id)])
+        urls = [used.metadata["url"]]
+        if self.config.get("sources") == "with_value":
+            pages = [(c.metadata["url"], c.metadata["url"] + "\n" + c.page_content) for c in chunks]
+            urls += [u for u in with_value(reply.answer, pages) if u not in urls]
+        return Answer(text=reply.answer, sources=[Source(url=u, snapshot_id=snapshot_id) for u in urls])
 
     def conflicts(self):
         return []

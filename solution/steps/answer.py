@@ -136,6 +136,14 @@ class Reply(BaseModel):
         return int(found.group()) if found else 0
 
 
+VALUE = re.compile(r"\d[\d,]*(?:\.\d+)?%?|\d{1,2}:\d{2}")
+
+
+def with_value(answer, pages):
+    values = {v for v in VALUE.findall(answer) if len(v) > 1}
+    return [url for url, text in pages if any(v in text for v in values)]
+
+
 def excerpts(chunks):
     parts = []
     for n, chunk in enumerate(chunks, 1):

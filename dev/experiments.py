@@ -10,7 +10,7 @@ sys.path[:0] = [str(ROOT / "harness"), str(ROOT / "solution")]
 import solution  # noqa: E402
 from contract import Answer, Source  # noqa: E402
 from scoring import score_item  # noqa: E402
-from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, Reply, reply  # noqa: E402
+from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, Reply, reply, with_value  # noqa: E402
 
 OUT = ROOT / "results" / "experiments"
 QUESTIONS = ROOT / "eval" / "public_eval.jsonl"
@@ -43,7 +43,25 @@ CONFIGS = {
     "12_rerank_10": {**BASE, "base": "04_closest", "prompt": "closest", "search": "vectors + bm25 + rerank", "about": "04 + rerank, the first 10"},
     "13_rerank_5": {**BASE, "base": "04_closest", "prompt": "closest", "search": "vectors + bm25 + rerank", "top_k": 5, "about": "04 + rerank, the first 5"},
     "14_rerank_3": {**BASE, "base": "04_closest", "prompt": "closest", "search": "vectors + bm25 + rerank", "top_k": 3, "about": "04 + rerank, the first 3"},
+    "15_plain_rerank_5": {**BASE, "base": "01_plain", "search": "vectors + bm25 + rerank", "top_k": 5, "about": "01 + rerank, the first 5 (13 without the closest rule)"},
+    "16_sources": {**BASE, "base": "13_rerank_5", "prompt": "closest", "search": "vectors + bm25 + rerank", "top_k": 5, "sources": "with_value",
+                   "about": "13 + the sources: every chunk with a value from the answer, not only the one the model names"},
 }
+
+
+def reuse(source, config, model, tag=""):
+    replies, seconds = {}, {}
+    if model == "claude-opus":
+        for f in sorted((OUT / source).glob("opus_answers_*.jsonl")):
+            for line in f.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    d = json.loads(line)
+                    replies[d["id"]] = Reply(**d)
+    else:
+        for line in (OUT / source / f"{file_name(model)}{tag}.replies.jsonl").read_text(encoding="utf-8").splitlines():
+            d = json.loads(line)
+            replies[d["id"]], seconds[d["id"]] = Reply(**d["reply"]), d["seconds"]
+    score(config, model, replies, seconds, tag)
 
 
 def questions():
@@ -120,12 +138,15 @@ def prompt(config, context):
     return PROMPTS[CONFIGS[config]["prompt"]].format(excerpts=context["excerpts"], question=context["question"])
 
 
-def to_answer(r, context):
+def to_answer(r, context, sources="one"):
     if not r.known:
         return Answer(text=DONT_KNOW, confident=False)
     n = r.source
-    url = context["urls"][n - 1] if 1 <= n <= len(context["urls"]) else context["urls"][0]
-    return Answer(text=r.answer, sources=[Source(url=url, snapshot_id=context["snapshot_id"])])
+    urls = [context["urls"][n - 1] if 1 <= n <= len(context["urls"]) else context["urls"][0]]
+    if sources == "with_value":
+        parts = re.split(r"\n\n(?=\[\d+\] https?://)", context["excerpts"])
+        urls += [u for u in with_value(r.answer, zip(context["urls"], parts)) if u not in urls]
+    return Answer(text=r.answer, sources=[Source(url=u, snapshot_id=context["snapshot_id"]) for u in urls])
 
 
 def score(config, model, replies, seconds=None, tag=""):
@@ -134,7 +155,7 @@ def score(config, model, replies, seconds=None, tag=""):
     rows = []
     for q in questions():
         r = replies.get(q["id"])
-        ans = to_answer(r, ctx[q["id"]]) if r else Answer(text="", confident=False)
+        ans = to_answer(r, ctx[q["id"]], CONFIGS[config].get("sources", "one")) if r else Answer(text="", confident=False)
         s = score_item(q, ans)
         s.update(error=None if r else "no reply", latency_s=seconds.get(q["id"]),
                  answer={"text": ans.text, "confident": ans.confident, "sources": [{"url": x.url} for x in ans.sources]})
@@ -211,4 +232,4 @@ def score_agents(config):
 
 if __name__ == "__main__":
     command, args = sys.argv[1], sys.argv[2:]
-    {"contexts": contexts, "recall": recall, "run": run, "agent_prompts": agent_prompts, "score_agents": score_agents}[command](*args)
+    {"contexts": contexts, "recall": recall, "run": run, "reuse": reuse, "agent_prompts": agent_prompts, "score_agents": score_agents}[command](*args)
