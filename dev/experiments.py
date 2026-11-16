@@ -1,4 +1,5 @@
 import hashlib
+import re
 import time
 import json
 import sys
@@ -15,14 +16,33 @@ OUT = ROOT / "results" / "experiments"
 QUESTIONS = ROOT / "eval" / "public_eval.jsonl"
 SEARCH_KEYS = ("clean", "split", "chunk_size", "embedding", "search", "candidates", "top_k")
 
-BASE = {k: v for k, v in solution.CONFIG.items() if k != "llm"}
+BASE = {
+    "clean": ["images", "links", "markdown_noise", "html_noise", "blocks", "repeated_lines", "tidy", "head",
+              "app_pages", "empty_pages", "copies"],
+    "split": "sections",
+    "chunk_size": 4000,
+    "embedding": "bge-m3",
+    "search": "vectors + bm25",
+    "candidates": 20,
+    "top_k": 10,
+    "prompt": "plain",
+}
 CONFIGS = {
     "01_plain": {**BASE, "prompt": "plain", "about": "the 10 chunks of search, no rules, a short analysis"},
-    "02_chain_of_thought": {**BASE, "base": "01_plain", "prompt": "chain_of_thought", "about": "chain of thought: think step by step before the answer, as in RAG-Challenge-2"},
-    "03_site_words": {**BASE, "base": "01_plain", "prompt": "site_words", "about": "plain + one rule: numbers, counts and names in the words of the site"},
-    "04_closest": {**BASE, "base": "01_plain", "prompt": "closest", "about": "plain + no exact answer → the closest one, with where and when it is from"},
+    "02_chain_of_thought": {**BASE, "base": "01_plain", "prompt": "chain_of_thought", "about": "01 + chain of thought: think step by step before the answer, as in RAG-Challenge-2"},
+    "03_site_words": {**BASE, "base": "01_plain", "prompt": "site_words", "about": "01 + one rule: numbers, counts and names in the words of the site"},
+    "04_closest": {**BASE, "base": "01_plain", "prompt": "closest", "about": "01 + no exact answer → the closest one, with where and when it is from"},
     "04b_closest_strict": {**BASE, "base": "04_closest", "prompt": "closest_strict", "about": "04 + known = false when no excerpt gives the value asked for"},
     "05_looking_for": {**BASE, "base": "04b_closest_strict", "prompt": "looking_for", "about": "04b + first write what the member wants, known only if an excerpt gives it"},
+    "06_quote": {**BASE, "base": "05_looking_for", "prompt": "quote", "about": "05 + copy the exact words of the excerpts that give it, before the answer"},
+    "07_few_shot": {**BASE, "base": "04_closest", "prompt": "few_shot", "about": "04 + two examples: an old or partial value → answer with its date, no value → known = false"},
+    "08_only_strict": {**BASE, "base": "01_plain", "prompt": "only_strict", "about": "01 + known = false when no excerpt gives the value asked for"},
+    "09_only_looking_for": {**BASE, "base": "01_plain", "prompt": "only_looking_for", "about": "01 + first write what the member wants"},
+    "10_only_quote": {**BASE, "base": "01_plain", "prompt": "only_quote", "about": "01 + copy the exact words that give the answer, before it"},
+    "11_only_few_shot": {**BASE, "base": "01_plain", "prompt": "only_few_shot", "about": "01 + the two examples of 07"},
+    "12_rerank_10": {**BASE, "base": "04_closest", "prompt": "closest", "search": "vectors + bm25 + rerank", "about": "04 + rerank, the first 10"},
+    "13_rerank_5": {**BASE, "base": "04_closest", "prompt": "closest", "search": "vectors + bm25 + rerank", "top_k": 5, "about": "04 + rerank, the first 5"},
+    "14_rerank_3": {**BASE, "base": "04_closest", "prompt": "closest", "search": "vectors + bm25 + rerank", "top_k": 3, "about": "04 + rerank, the first 3"},
 }
 
 
@@ -53,8 +73,44 @@ def contexts(config):
     print(len(items), "contexts saved for", config)
 
 
+def recall(config, *ks):
+    from run_eval import load_snapshots
+    from steps.search import rerank
+
+    ks = [int(k) for k in ks] or [3, 5, 7, 10]
+    k = solution.build({**CONFIGS[config], "search": "vectors + bm25", "top_k": 100, "llm": "llama3.1:8b"})
+    for snapshot in load_snapshots(ROOT / "snapshots"):
+        k.ingest(snapshot)
+    found = {"vectors + bm25": dict.fromkeys(ks, 0), "vectors + bm25 + rerank": dict.fromkeys(ks, 0)}
+    asked = [q for q in questions() if q["must_include"]]
+    for n, q in enumerate(asked, 1):
+        fused = k.search(q["question"], k.pick(q.get("as_of")))
+        for mode, ranked in (("vectors + bm25", fused), ("vectors + bm25 + rerank", rerank(q["question"], fused))):
+            for top in ks:
+                text = "\n".join(doc.metadata["url"] + "\n" + doc.page_content for doc in ranked[:top])
+                found[mode][top] += all(m in text for m in q["must_include"])
+        print(f"{n}/{len(asked)} {q['id']}", flush=True)
+    for mode, counts in found.items():
+        print(mode, " · ".join(f"top {top}: {v}/{len(asked)}" for top, v in counts.items()))
+
+
+def cut(config, longer):
+    items = json.loads((OUT / f"contexts_{search_key(longer)}.json").read_text(encoding="utf-8"))
+    top = CONFIGS[config]["top_k"]
+    for c in items:
+        c["excerpts"] = "\n\n".join(re.split(r"\n\n(?=\[\d+\] https?://)", c["excerpts"])[:top])
+        c["urls"] = c["urls"][:top]
+    (OUT / f"contexts_{search_key(config)}.json").write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
+    print(len(items), "contexts cut to", top, "for", config)
+
+
 def load_contexts(config):
     path = OUT / f"contexts_{search_key(config)}.json"
+    same = lambda o: all(CONFIGS[o][k] == CONFIGS[config][k] for k in SEARCH_KEYS if k != "top_k")
+    longer = [o for o in CONFIGS if same(o) and CONFIGS[o]["top_k"] > CONFIGS[config]["top_k"]
+              and (OUT / f"contexts_{search_key(o)}.json").exists()]
+    if not path.exists() and longer:
+        cut(config, longer[0])
     if not path.exists():
         contexts(config)
     return {c["id"]: c for c in json.loads(path.read_text(encoding="utf-8"))}
@@ -72,7 +128,7 @@ def to_answer(r, context):
     return Answer(text=r.answer, sources=[Source(url=url, snapshot_id=context["snapshot_id"])])
 
 
-def score(config, model, replies, seconds=None):
+def score(config, model, replies, seconds=None, tag=""):
     ctx = load_contexts(config)
     seconds = seconds or {}
     rows = []
@@ -85,24 +141,24 @@ def score(config, model, replies, seconds=None):
         rows.append(s)
     folder = OUT / config
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / f"{file_name(model)}.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    (folder / f"{file_name(model)}{tag}.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
     (folder / "config.json").write_text(json.dumps(CONFIGS[config], indent=2), encoding="utf-8")
     ok = [r for r in rows if not r["error"]]
     acc = sum(r["score"] * r["weight"] for r in ok) / sum(r["weight"] for r in ok)
     times = sorted(t for t in seconds.values() if t is not None)
     speed = f" · {sum(times) / len(times):.1f} s a question, p95 {times[int(0.95 * len(times))]:.1f} s" if times else ""
-    print(f"{config} · {model}: accuracy {acc:.3f} on {len(ok)} of {len(rows)}{speed}")
+    print(f"{config} · {model}{tag}: accuracy {acc:.3f} on {len(ok)} of {len(rows)}{speed}")
 
 
 def file_name(model):
     return model.replace(":", "_")
 
 
-def run(config, model, limit=None):
+def run(config, model, limit=None, tag=""):
     llm = LLMS[model]()
     folder = OUT / config
     folder.mkdir(parents=True, exist_ok=True)
-    raw = folder / f"{file_name(model)}.replies.jsonl"
+    raw = folder / f"{file_name(model)}{tag}.replies.jsonl"
     replies, seconds = {}, {}
     if raw.exists():
         for line in raw.read_text(encoding="utf-8").splitlines():
@@ -114,14 +170,22 @@ def run(config, model, limit=None):
             continue
         start = time.time()
         try:
-            replies[c["id"]] = reply(llm, GAPS[model], prompt(config, c))
+            try:
+                replies[c["id"]] = reply(llm, GAPS[model], prompt(config, c))
+            except Exception as e:
+                if "RESOURCE_EXHAUSTED" not in str(e):
+                    raise
+                print(f"{n}/{len(items)} {c['id']} rate limit, waiting 60 s", flush=True)
+                time.sleep(60)
+                start = time.time()
+                replies[c["id"]] = reply(llm, GAPS[model], prompt(config, c))
             seconds[c["id"]] = round(time.time() - start, 1)
             with raw.open("a", encoding="utf-8") as f:
                 f.write(json.dumps({"id": c["id"], "seconds": seconds[c["id"]], "reply": replies[c["id"]].model_dump()}) + "\n")
             print(f"{n}/{len(items)} {c['id']} {seconds[c['id']]} s", flush=True)
         except Exception as e:
             print(f"{n}/{len(items)} {c['id']} failed {type(e).__name__}: {str(e)[:100]}", flush=True)
-    score(config, model, replies, seconds)
+    score(config, model, replies, seconds, tag)
 
 
 def agent_prompts(config, parts=4):
@@ -147,4 +211,4 @@ def score_agents(config):
 
 if __name__ == "__main__":
     command, args = sys.argv[1], sys.argv[2:]
-    {"contexts": contexts, "run": run, "agent_prompts": agent_prompts, "score_agents": score_agents}[command](*args)
+    {"contexts": contexts, "recall": recall, "run": run, "agent_prompts": agent_prompts, "score_agents": score_agents}[command](*args)

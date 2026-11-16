@@ -21,6 +21,18 @@ class Keywords:
         return [self.docs[i] for i in best]
 
 
+RERANKER = "BAAI/bge-reranker-v2-m3"
+reranker = []
+
+
+def rerank(question, docs):
+    if not reranker:
+        from sentence_transformers import CrossEncoder
+        reranker.append(CrossEncoder(RERANKER, max_length=1024))
+    scores = reranker[0].predict([(question, doc.page_content) for doc in docs])
+    return [doc for _, doc in sorted(zip(scores, docs), key=lambda pair: -pair[0])]
+
+
 def fuse(rankings):
     scores, docs = {}, {}
     for ranking in rankings:

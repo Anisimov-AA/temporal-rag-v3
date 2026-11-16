@@ -14,13 +14,14 @@ KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 GCP = os.getenv("GCP_OLLAMA", "http://localhost:11435")
 
 GAPS = {"gemini-3.5-flash-lite": 4.5, "gemma-4-31b-it": 35, "llama3.1:8b": 0, "qwen3:8b": 0,
-        "gcp:qwen3:32b": 0, "gcp:gpt-oss:20b": 0, "gcp:gemma4:31b": 0}
+        "gcp:qwen3:32b": 0, "gcp:qwen3:30b-a3b": 0, "gcp:gpt-oss:20b": 0, "gcp:gemma4:31b": 0}
 LLMS = {
-    "gemini-3.5-flash-lite": lambda: ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", temperature=0, max_retries=4, api_key=KEY),
+    "gemini-3.5-flash-lite": lambda: ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", temperature=0, max_retries=0, api_key=KEY),
     "gemma-4-31b-it": lambda: ChatGoogleGenerativeAI(model="gemma-4-31b-it", temperature=0, max_retries=4, api_key=KEY),
     "llama3.1:8b": lambda: ChatOllama(model="llama3.1:8b", temperature=0, num_ctx=8192),
     "qwen3:8b": lambda: ChatOllama(model="qwen3:8b", temperature=0, num_ctx=8192, reasoning=False),
     "gcp:qwen3:32b": lambda: ChatOllama(model="qwen3:32b", base_url=GCP, temperature=0, num_ctx=8192, reasoning=False),
+    "gcp:qwen3:30b-a3b": lambda: ChatOllama(model="qwen3:30b-a3b-instruct-2507-q4_K_M", base_url=GCP, temperature=0, num_ctx=8192, num_predict=1024),
     "gcp:gpt-oss:20b": lambda: ChatOllama(model="gpt-oss:20b", base_url=GCP, temperature=0, num_ctx=8192, reasoning="low"),
     "gcp:gemma4:31b": lambda: ChatOllama(model="gemma4:31b", base_url=GCP, temperature=0, num_ctx=8192),
 }
@@ -74,19 +75,54 @@ LOOKING_FOR = (CLOSEST_STRICT
                         "Describing the product is not enough.\n")
                .replace('Reply as JSON: {{"analysis"', 'Reply as JSON: {{"looking_for": …, "analysis"'))
 
+QUOTE = (LOOKING_FOR
+         .replace("First write what the member wants, in a few words (looking_for).\n",
+                  "First write what the member wants, in a few words (looking_for).\n"
+                  "Then copy the exact words of the excerpts that give it (quote), or \"\" if none do.\n")
+         .replace('{{"looking_for": …, "analysis"', '{{"looking_for": …, "quote": …, "analysis"'))
+
+EXAMPLES = """Example 1
+Excerpt [2] a news post · 2022-09-07: "Branch hours: Monday-Friday N a.m.-N p.m."
+Question: What are your hours?
+Reply: {{"analysis": "Only one branch's hours, from a 2022 news post.", "answer": "Per a 2022 news post, the X branch is open Monday-Friday N a.m.-N p.m.", "source": 2, "known": true}}
+
+Example 2
+Excerpt [1] a product page: "The Y loan has a fixed rate for the first year."
+Question: What is the rate on the Y loan?
+Reply: {{"analysis": "The product is described, but no rate is given.", "answer": "", "source": 1, "known": false}}
+
+"""
+
+FEW_SHOT = CLOSEST.replace("Website excerpts:\n", EXAMPLES + "Website excerpts:\n", 1)
+
+TOP = "You answer only from the website excerpts you are given.\n"
+
+
+def plain_plus(rule, fields=""):
+    prompt = PLAIN.replace(TOP, TOP + rule, 1)
+    return prompt.replace('Reply as JSON: {{"analysis"', 'Reply as JSON: {{' + fields + '"analysis"', 1)
+
+
+ONLY_STRICT = plain_plus("Set known to false when no excerpt gives the value asked for, even if the excerpts describe the product.\n")
+ONLY_LOOKING_FOR = plain_plus("First write what the member wants, in a few words (looking_for).\n", '"looking_for": …, ')
+ONLY_QUOTE = plain_plus("Copy the exact words of the excerpts that give the answer (quote), or \"\" if none do.\n", '"quote": …, ')
+ONLY_FEW_SHOT = PLAIN.replace("Website excerpts:\n", EXAMPLES + "Website excerpts:\n", 1)
+
 PROMPTS = {"plain": PLAIN, "chain_of_thought": CHAIN_OF_THOUGHT, "site_words": SITE_WORDS, "closest": CLOSEST,
-           "closest_strict": CLOSEST_STRICT, "looking_for": LOOKING_FOR}
+           "closest_strict": CLOSEST_STRICT, "looking_for": LOOKING_FOR, "quote": QUOTE, "few_shot": FEW_SHOT,
+           "only_strict": ONLY_STRICT, "only_looking_for": ONLY_LOOKING_FOR, "only_quote": ONLY_QUOTE, "only_few_shot": ONLY_FEW_SHOT}
 
 
 class Reply(BaseModel):
     looking_for: str = ""
+    quote: str = ""
     analysis: str
     summary: str = ""
     answer: str
     source: int
     known: bool
 
-    @field_validator("looking_for", "analysis", "summary", "answer", mode="before")
+    @field_validator("looking_for", "quote", "analysis", "summary", "answer", mode="before")
     @classmethod
     def as_text(cls, value):
         if isinstance(value, list):

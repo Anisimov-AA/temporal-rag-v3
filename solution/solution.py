@@ -7,12 +7,12 @@ from steps.answer import DONT_KNOW, GAPS, LLMS, ask  # noqa: E402
 from steps.clean import clean  # noqa: E402
 from steps.index import EMBEDDINGS, build_index, fingerprint, index_docs  # noqa: E402
 from steps.load import to_documents  # noqa: E402
-from steps.search import Keywords, fuse  # noqa: E402
+from steps.search import Keywords, fuse, rerank  # noqa: E402
 from steps.split import split_into_chunks  # noqa: E402
 
 INDEX_DIR = Path(__file__).resolve().parents[1] / "index"
 SPLITS = {"sections": split_into_chunks}
-SEARCHES = ("vectors + bm25", "vectors", "bm25")
+SEARCHES = ("vectors + bm25", "vectors", "bm25", "vectors + bm25 + rerank")
 CONFIG = {
     "clean": [
         "images",
@@ -30,11 +30,11 @@ CONFIG = {
     "split": "sections",
     "chunk_size": 4000,
     "embedding": "bge-m3",
-    "search": "vectors + bm25",
+    "search": "vectors + bm25 + rerank",
     "candidates": 20,
-    "top_k": 10,
-    "llm": "llama3.1:8b",
-    "prompt": "plain",
+    "top_k": 5,
+    "llm": "gcp:qwen3:30b-a3b",
+    "prompt": "closest",
 }
 
 
@@ -66,11 +66,14 @@ class Knowledge:
     def search(self, question, snapshot_id):
         c = self.config
         lists = []
-        if c["search"] in ("vectors + bm25", "vectors"):
+        if "vectors" in c["search"]:
             lists.append(self.stores[snapshot_id].similarity_search(question, k=c["candidates"]))
-        if c["search"] in ("vectors + bm25", "bm25"):
+        if "bm25" in c["search"]:
             lists.append(self.keywords[snapshot_id].search(question, c["candidates"]))
-        return fuse(lists)[: c["top_k"]]
+        found = fuse(lists)
+        if "rerank" in c["search"]:
+            found = rerank(question, found)
+        return found[: c["top_k"]]
 
     def pick(self, as_of):
         days = {sid: day for sid, day in self.dates.items() if as_of is None or day <= as_of}
