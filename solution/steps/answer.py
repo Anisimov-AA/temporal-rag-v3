@@ -154,13 +154,27 @@ def with_value(answer, pages):
     return [url for url, text in pages if any(v in text for v in values)]
 
 
-def excerpts(chunks):
+KINDS = (("/newsroom/", "news post"), ("/blog/", "blog post"), (".pdf", "PDF"), ("/rates", "rates page"))
+
+
+def kind(url):
+    return next((name for part, name in KINDS if part in url), "page")
+
+
+def newest_first(pieces, today):
+    ordered = sorted(pieces, key=lambda p: p[1], reverse=True)
     parts = []
-    for n, chunk in enumerate(chunks, 1):
-        m = chunk.metadata
-        date = m.get("published") or m["taken_on"]
-        parts.append(f"[{n}] {m['url']} · {date}\n{chunk.page_content}")
-    return "\n\n".join(parts)
+    for n, (url, date, text) in enumerate(ordered, 1):
+        when = f"page as of {date}" if date == today else f"published {date}"
+        parts.append(f"[{n}] {kind(url)} · {when} · {url}\n{text}")
+    return "\n\n".join(parts), [url for url, _, _ in ordered]
+
+
+def excerpts(chunks, order="score", today=""):
+    pieces = [(c.metadata["url"], c.metadata.get("published") or c.metadata["taken_on"], c.page_content) for c in chunks]
+    if order == "newest":
+        return newest_first(pieces, today)[0]
+    return "\n\n".join(f"[{n}] {url} · {date}\n{text}" for n, (url, date, text) in enumerate(pieces, 1))
 
 
 last_call = [0.0]
@@ -174,6 +188,6 @@ def reply(llm, gap, prompt):
     return Reply(**(llm | JsonOutputParser()).invoke(prompt))
 
 
-def ask(llm, gap, prompt_name, question, chunks, today=""):
-    prompt = PROMPTS[prompt_name].format(excerpts=excerpts(chunks), question=question, today=today)
+def ask(llm, gap, prompt_name, question, chunks, today="", order="score"):
+    prompt = PROMPTS[prompt_name].format(excerpts=excerpts(chunks, order, today), question=question, today=today)
     return reply(llm, gap, prompt)

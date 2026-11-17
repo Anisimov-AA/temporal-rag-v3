@@ -10,7 +10,7 @@ sys.path[:0] = [str(ROOT / "harness"), str(ROOT / "solution")]
 import solution  # noqa: E402
 from contract import Answer, Source  # noqa: E402
 from scoring import score_item  # noqa: E402
-from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, Reply, reply, with_value  # noqa: E402
+from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, Reply, newest_first, reply, with_value  # noqa: E402
 
 OUT = ROOT / "results" / "experiments"
 QUESTIONS = ROOT / "eval" / "public_eval.jsonl"
@@ -56,6 +56,8 @@ CONFIGS = {
                "about": "16 + every rule that helped Opus: strict, looking for, quote, two examples, newest, combine, today"},
     "21_quote_rerank": {**BASE, "base": "16_sources", "prompt": "quote", "search": "vectors + bm25 + rerank", "top_k": 5, "sources": "with_value",
                         "about": "16 with the prompt of 06 (strict, looking for, quote)"},
+    "22_newest_first": {**BASE, "base": "16_sources", "prompt": "closest", "search": "vectors + bm25 + rerank", "top_k": 5, "sources": "with_value",
+                        "excerpts": "newest", "about": "16 + excerpts sorted newest first, each with its page kind and date"},
 }
 
 
@@ -144,8 +146,24 @@ def load_contexts(config):
     return {c["id"]: c for c in json.loads(path.read_text(encoding="utf-8"))}
 
 
+HEAD = re.compile(r"^\[\d+\] (\S+) · (\S+)\n")
+
+
+def shaped(config, context):
+    if CONFIGS[config].get("excerpts") != "newest":
+        return context
+    today = context["snapshot_id"].split("_")[1]
+    pieces = []
+    for part in re.split(r"\n\n(?=\[\d+\] https?://)", context["excerpts"]):
+        found = HEAD.match(part)
+        pieces.append((found.group(1), found.group(2), part[found.end():]))
+    text, urls = newest_first(pieces, today)
+    return {**context, "excerpts": text, "urls": urls}
+
+
 def prompt(config, context):
     today = context["snapshot_id"].split("_")[1]
+    context = shaped(config, context)
     return PROMPTS[CONFIGS[config]["prompt"]].format(excerpts=context["excerpts"], question=context["question"], today=today)
 
 
@@ -166,7 +184,7 @@ def score(config, model, replies, seconds=None, tag=""):
     rows = []
     for q in questions():
         r = replies.get(q["id"])
-        ans = to_answer(r, ctx[q["id"]], CONFIGS[config].get("sources", "one")) if r else Answer(text="", confident=False)
+        ans = to_answer(r, shaped(config, ctx[q["id"]]), CONFIGS[config].get("sources", "one")) if r else Answer(text="", confident=False)
         s = score_item(q, ans)
         s.update(error=None if r else "no reply", latency_s=seconds.get(q["id"]),
                  answer={"text": ans.text, "confident": ans.confident, "sources": [{"url": x.url} for x in ans.sources]})
