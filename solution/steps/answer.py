@@ -14,7 +14,7 @@ KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 GCP = os.getenv("GCP_OLLAMA", "http://localhost:11435")
 
 GAPS = {"gemini-3.5-flash-lite": 4.5, "gemma-4-31b-it": 35, "llama3.1:8b": 0, "qwen3:8b": 0,
-        "gcp:qwen3:32b": 0, "gcp:qwen3:30b-a3b": 0, "gcp:gpt-oss:20b": 0, "gcp:gemma4:31b": 0}
+        "gcp:qwen3:32b": 0, "gcp:qwen3:30b-a3b": 0, "gcp:qwen3:30b-a3b-thinking": 0, "gcp:qwen3.6:35b-a3b": 0, "gcp:gpt-oss:20b": 0, "gcp:gemma4:31b": 0}
 LLMS = {
     "gemini-3.5-flash-lite": lambda: ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", temperature=0, max_retries=0, api_key=KEY),
     "gemma-4-31b-it": lambda: ChatGoogleGenerativeAI(model="gemma-4-31b-it", temperature=0, max_retries=4, api_key=KEY),
@@ -22,6 +22,9 @@ LLMS = {
     "qwen3:8b": lambda: ChatOllama(model="qwen3:8b", temperature=0, num_ctx=8192, reasoning=False),
     "gcp:qwen3:32b": lambda: ChatOllama(model="qwen3:32b", base_url=GCP, temperature=0, num_ctx=8192, reasoning=False),
     "gcp:qwen3:30b-a3b": lambda: ChatOllama(model="qwen3:30b-a3b-instruct-2507-q4_K_M", base_url=GCP, temperature=0, num_ctx=8192, num_predict=1024),
+    "gcp:qwen3:30b-a3b-thinking": lambda: ChatOllama(model="qwen3:30b-a3b-thinking-2507-q4_K_M", base_url=GCP, temperature=0, num_ctx=16384,
+                                                     num_predict=4096, reasoning=True),
+    "gcp:qwen3.6:35b-a3b": lambda: ChatOllama(model="qwen3.6:35b-a3b", base_url=GCP, temperature=0, num_ctx=8192, num_predict=1024, reasoning=False),
     "gcp:gpt-oss:20b": lambda: ChatOllama(model="gpt-oss:20b", base_url=GCP, temperature=0, num_ctx=8192, reasoning="low"),
     "gcp:gemma4:31b": lambda: ChatOllama(model="gemma4:31b", base_url=GCP, temperature=0, num_ctx=8192),
 }
