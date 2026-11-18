@@ -89,9 +89,11 @@ def speed(model, count="10", gpu="L4"):
     llm.invoke("Reply OK")
     times = []
     for c in list(load_contexts().values())[: int(count)]:
+        start = time.time()
         message = llm.invoke(c["prompt"])
-        times.append(model_seconds(message))
-        print(f"{c['id']} model {times[-1]} s", flush=True)
+        wall = round(time.time() - start, 1)
+        times.append(model_seconds(message) or wall)
+        print(f"{c['id']} {times[-1]} s", flush=True)
     folder = OUT / "speed"
     folder.mkdir(parents=True, exist_ok=True)
     result = {"model": model, "gpu": gpu, "questions": len(times), "model_seconds": sum(times) / len(times), "each": times}
