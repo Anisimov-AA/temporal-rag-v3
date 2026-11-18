@@ -22,7 +22,7 @@ LLMS = {
     "gemma-4-31b-it": lambda: ChatGoogleGenerativeAI(model="gemma-4-31b-it", temperature=0, max_retries=4, api_key=KEY),
     "llama3.1:8b": lambda: ChatOllama(model="llama3.1:8b", temperature=0, seed=42, num_ctx=8192),
     "qwen3:8b": lambda: ChatOllama(model="qwen3:8b", temperature=0, seed=42, num_ctx=8192, reasoning=False),
-    "gcp:qwen3:32b": lambda: ChatOllama(model="qwen3:32b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, reasoning=False),
+    "gcp:qwen3:32b": lambda: ChatOllama(model="qwen3:32b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=16384, reasoning=False),
     "gcp:qwen3:30b-a3b": lambda: ChatOllama(model="qwen3:30b-a3b-instruct-2507-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024),
     "gcp:qwen3:30b-a3b-thinking": lambda: ChatOllama(model="qwen3:30b-a3b-thinking-2507-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=16384,
                                                      num_predict=4096, reasoning=True),
