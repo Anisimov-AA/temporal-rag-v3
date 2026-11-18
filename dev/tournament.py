@@ -47,11 +47,11 @@ def load_contexts():
     return {c["id"]: c for c in json.loads(CONTEXTS.read_text(encoding="utf-8"))}
 
 
-def run(model, runs="3"):
+def run(model, runs="3", first="1"):
     llm = LLMS[model]()
     folder = OUT / model.replace(":", "_")
     folder.mkdir(parents=True, exist_ok=True)
-    for n in range(1, int(runs) + 1):
+    for n in range(int(first), int(first) + int(runs)):
         lines = []
         for c in load_contexts().values():
             start = time.time()
