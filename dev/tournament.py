@@ -84,6 +84,21 @@ def run(model, runs="3", first="1"):
         (folder / f"run{n}.jsonl").write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in lines), encoding="utf-8")
 
 
+def speed(model, count="10", gpu="L4"):
+    llm = LLMS[model]()
+    llm.invoke("Reply OK")
+    times = []
+    for c in list(load_contexts().values())[: int(count)]:
+        message = llm.invoke(c["prompt"])
+        times.append(model_seconds(message))
+        print(f"{c['id']} model {times[-1]} s", flush=True)
+    folder = OUT / "speed"
+    folder.mkdir(parents=True, exist_ok=True)
+    result = {"model": model, "gpu": gpu, "questions": len(times), "model_seconds": sum(times) / len(times), "each": times}
+    (folder / f"{model.replace(':', '_')}_{gpu}.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
+    print(f"{model} on {gpu}: {result['model_seconds']:.1f} s per answer")
+
+
 def agent_prompts():
     items = list(load_contexts().values())
     size = -(-len(items) // AGENT_PARTS)
@@ -152,4 +167,4 @@ def score():
 
 if __name__ == "__main__":
     command, args = sys.argv[1], sys.argv[2:]
-    {"contexts": contexts, "run": run, "agent_prompts": agent_prompts, "score": score}[command](*args)
+    {"contexts": contexts, "run": run, "speed": speed, "agent_prompts": agent_prompts, "score": score}[command](*args)
