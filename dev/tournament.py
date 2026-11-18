@@ -8,7 +8,8 @@ sys.path[:0] = [str(ROOT / "harness"), str(ROOT / "solution")]
 import solution  # noqa: E402
 from contract import Answer, Source  # noqa: E402
 from scoring import score_item  # noqa: E402
-from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, VALUE, Reply, excerpts, reply, with_value  # noqa: E402
+from langchain_core.output_parsers import JsonOutputParser  # noqa: E402
+from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, VALUE, Reply, excerpts, with_value  # noqa: E402
 
 QUESTIONS = ROOT / "eval" / "public_eval.jsonl"
 SPLIT = ROOT / "dev" / "split.json"
@@ -47,17 +48,36 @@ def load_contexts():
     return {c["id"]: c for c in json.loads(CONTEXTS.read_text(encoding="utf-8"))}
 
 
+def wait_for_limit(gap, last):
+    left = gap - (time.time() - last)
+    if left > 0:
+        time.sleep(left)
+
+
+def model_seconds(message):
+    meta = message.response_metadata
+    if "total_duration" not in meta:
+        return None
+    return round((meta["total_duration"] - meta.get("load_duration", 0)) / 1e9, 1)
+
+
 def run(model, runs="3", first="1"):
     llm = LLMS[model]()
+    gap = GAPS[model]
     folder = OUT / model.replace(":", "_")
     folder.mkdir(parents=True, exist_ok=True)
     for n in range(int(first), int(first) + int(runs)):
+        llm.invoke("Reply OK")
+        last = time.time()
         lines = []
         for c in load_contexts().values():
-            start = time.time()
+            wait_for_limit(gap, last)
+            start = last = time.time()
             try:
-                r = reply(llm, GAPS[model], c["prompt"])
-                lines.append({"id": c["id"], "reply": r.model_dump(), "seconds": round(time.time() - start, 1)})
+                message = llm.invoke(c["prompt"])
+                r = Reply(**JsonOutputParser().invoke(message))
+                lines.append({"id": c["id"], "reply": r.model_dump(), "seconds": round(time.time() - start, 1),
+                              "model_seconds": model_seconds(message)})
             except Exception as error:
                 lines.append({"id": c["id"], "error": str(error)[:200], "seconds": round(time.time() - start, 1)})
             print(f"run {n} {c['id']} {lines[-1]['seconds']} s", flush=True)
@@ -102,7 +122,7 @@ def score():
         runs = [load_run(p) for p in sorted(folder.glob("run?.jsonl"))]
         if not runs:
             continue
-        per_run, per_question, seconds = [], {}, []
+        per_run, per_question, seconds, model_time = [], {}, [], []
         for rows in runs:
             total = weight = 0
             for qid, q in qs.items():
@@ -114,14 +134,19 @@ def score():
                 per_question.setdefault(qid, []).append((s["score"], sorted(set(VALUE.findall(ans.text))), ans.confident))
                 if d.get("seconds") is not None:
                     seconds.append(d["seconds"])
+                if d.get("model_seconds") is not None:
+                    model_time.append(d["model_seconds"])
             per_run.append(total / weight)
         same = sum(1 for v in per_question.values() if len({(x[0], tuple(x[1]), x[2]) for x in v}) == 1)
         table[folder.name] = {"accuracy": sum(per_run) / len(per_run), "runs": per_run, "repeat": same / len(per_question),
                               "seconds": sum(seconds) / len(seconds) if seconds else None,
+                              "model_seconds": sum(model_time) / len(model_time) if model_time else None,
                               "questions": {qid: [x[0] for x in v] for qid, v in per_question.items()}}
     (OUT / "scores.json").write_text(json.dumps(table, indent=1), encoding="utf-8")
     for name, t in table.items():
         sec = f"{t['seconds']:.1f} s" if t["seconds"] is not None else "-"
+        if t["model_seconds"] is not None:
+            sec += f" (model {t['model_seconds']:.1f} s)"
         print(f"{name:28} accuracy {t['accuracy']:.3f} ({' / '.join(f'{x:.3f}' for x in t['runs'])}) · repeat {t['repeat']:.2f} · {sec}")
 
 
