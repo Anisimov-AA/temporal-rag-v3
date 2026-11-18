@@ -61,10 +61,10 @@ def answer_text(d, context):
     return tournament.to_answer(Reply(**d["reply"]), context).text
 
 
-SECTIONS = [("step2", "Step 2 · LLM", ROOT / "results" / "tournament"),
-            ("top3", "Step 3 · top 3", ROOT / "results" / "tournament" / "variants" / "top3"),
-            ("top10", "Step 3 · top 10", ROOT / "results" / "tournament" / "variants" / "top10"),
-            ("norerank10", "Step 3 · no rerank, top 10", ROOT / "results" / "tournament" / "variants" / "norerank10")]
+SECTIONS = [("step2", "Step 2 · Pick the LLM", ROOT / "results" / "tournament"),
+            ("top3", "Step 3 · 3 chunks", ROOT / "results" / "tournament" / "variants" / "top3"),
+            ("top10", "Step 3 · 10 chunks", ROOT / "results" / "tournament" / "variants" / "top10"),
+            ("norerank10", "Step 3 · 10 chunks, no rerank", ROOT / "results" / "tournament" / "variants" / "norerank10")]
 
 
 def section(key, folder, qs):
