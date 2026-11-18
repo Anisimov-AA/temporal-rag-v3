@@ -169,7 +169,7 @@ def score():
                     model_time.append(d["model_seconds"])
             per_run.append(total / weight)
         same = sum(1 for v in per_question.values() if len({(x[0], tuple(x[1]), x[2]) for x in v}) == 1)
-        table[folder.name] = {"accuracy": sum(per_run) / len(per_run), "runs": per_run, "repeat": same / len(per_question),
+        table[folder.name] = {"accuracy": sum(per_run) / len(per_run), "runs": per_run, "repeat": same / len(per_question) if len(runs) > 1 else None,
                               "seconds": sum(seconds) / len(seconds) if seconds else None,
                               "model_seconds": sum(model_time) / len(model_time) if model_time else None,
                               "questions": {qid: [x[0] for x in v] for qid, v in per_question.items()}}
@@ -178,7 +178,7 @@ def score():
         sec = f"{t['seconds']:.1f} s" if t["seconds"] is not None else "-"
         if t["model_seconds"] is not None:
             sec += f" (model {t['model_seconds']:.1f} s)"
-        print(f"{name:28} accuracy {t['accuracy']:.3f} ({' / '.join(f'{x:.3f}' for x in t['runs'])}) · repeat {t['repeat']:.2f} · {sec}")
+        print(f"{name:28} accuracy {t['accuracy']:.3f} ({' / '.join(f'{x:.3f}' for x in t['runs'])}) · repeat {'-' if t['repeat'] is None else format(t['repeat'], '.2f')} · {sec}")
 
 
 if __name__ == "__main__":
