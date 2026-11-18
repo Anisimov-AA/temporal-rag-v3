@@ -9,7 +9,7 @@ from steps.conflicts import find_conflicts  # noqa: E402
 from steps.index import EMBEDDINGS, build_index, fingerprint, index_docs  # noqa: E402
 from steps.load import to_documents  # noqa: E402
 from steps.rates import rate_table  # noqa: E402
-from steps.search import Keywords, fuse, rerank  # noqa: E402
+from steps.search import Keywords, fuse, newest_effective_first, rerank  # noqa: E402
 from steps.split import split_into_chunks  # noqa: E402
 
 INDEX_DIR = Path(__file__).resolve().parents[1] / "index"
@@ -38,6 +38,7 @@ CONFIG = {
     "llm": "gcp:qwen3:30b-a3b",
     "prompt": "closest",
     "sources": "with_value",
+    "dates": "newest effective first",
 }
 
 
@@ -78,7 +79,10 @@ class Knowledge:
         found = fuse(lists)
         if "rerank" in c["search"]:
             found = rerank(question, found)
-        return found[: c["top_k"]]
+        found = found[: c["top_k"]]
+        if c.get("dates") == "newest effective first":
+            found = newest_effective_first(found)
+        return found
 
     def pick(self, as_of):
         days = {sid: day for sid, day in self.dates.items() if as_of is None or day <= as_of}
