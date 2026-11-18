@@ -14,7 +14,7 @@ from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, VALUE, Reply, excerpts,
 
 QUESTIONS = ROOT / "eval" / "public_eval.jsonl"
 SPLIT = ROOT / "dev" / "split.json"
-VARIANTS = {"base": {}, "top3": {"top_k": 3}, "top10": {"top_k": 10}, "norerank10": {"search": "vectors + bm25", "top_k": 10}}
+VARIANTS = {"base": {}, "top3": {"top_k": 3}, "top10": {"top_k": 10}, "top15": {"top_k": 15}, "norerank10": {"search": "vectors + bm25", "top_k": 10}}
 VARIANT = os.getenv("VARIANT", "base")
 OUT = ROOT / "results" / "tournament" if VARIANT == "base" else ROOT / "results" / "tournament" / "variants" / VARIANT
 CONTEXTS = OUT / "contexts.json"
