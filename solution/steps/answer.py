@@ -29,7 +29,7 @@ LLMS = {
     "gcp:gpt-oss:20b": lambda: ChatOllama(model="gpt-oss:20b", base_url=GCP, temperature=0, seed=42, num_ctx=8192, reasoning="low"),
     "gcp:gemma4:31b": lambda: ChatOllama(model="gemma4:31b", base_url=GCP, temperature=0, seed=42, num_ctx=8192),
     "gcp:qwen3.6:27b": lambda: ChatOllama(model="qwen3.6:27b-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024, reasoning=False),
-    "gcp:gemma4:26b": lambda: ChatOllama(model="gemma4:26b-a4b-it-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024),
+    "gcp:gemma4:26b": lambda: ChatOllama(model="gemma4:26b-a4b-it-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024, reasoning=False),
     "gcp:mistral-small3.2:24b": lambda: ChatOllama(model="mistral-small3.2:24b-instruct-2506-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024),
     "gcp:command-r:35b": lambda: ChatOllama(model="command-r:35b-08-2024-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024),
     "gcp:llama3.3:70b": lambda: ChatOllama(model="llama3.3:70b", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024),
