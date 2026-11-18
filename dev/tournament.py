@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -13,9 +14,12 @@ from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, VALUE, Reply, excerpts,
 
 QUESTIONS = ROOT / "eval" / "public_eval.jsonl"
 SPLIT = ROOT / "dev" / "split.json"
-OUT = ROOT / "results" / "tournament"
+VARIANTS = {"base": {}, "top3": {"top_k": 3}, "top10": {"top_k": 10}, "norerank10": {"search": "vectors + bm25", "top_k": 10}}
+VARIANT = os.getenv("VARIANT", "base")
+OUT = ROOT / "results" / "tournament" if VARIANT == "base" else ROOT / "results" / "tournament" / "variants" / VARIANT
 CONTEXTS = OUT / "contexts.json"
-CONFIG = {**solution.CONFIG, "prompt": "plain", "top_k": 5}
+CONFIG = {**solution.CONFIG, "prompt": "plain", "top_k": 5, **VARIANTS[VARIANT]}
+SKIP = {"speed", "variants"}
 AGENT_PARTS = 3
 
 
@@ -67,7 +71,7 @@ def run(model, runs="3", first="1"):
     folder = OUT / model.replace(":", "_")
     folder.mkdir(parents=True, exist_ok=True)
     for n in range(int(first), int(first) + int(runs)):
-        llm.invoke("Reply OK")
+        warm_up(llm)
         last = time.time()
         lines = []
         for c in load_contexts().values():
@@ -84,9 +88,19 @@ def run(model, runs="3", first="1"):
         (folder / f"run{n}.jsonl").write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in lines), encoding="utf-8")
 
 
+def warm_up(llm, tries=5):
+    for _ in range(tries):
+        try:
+            llm.invoke("Reply OK")
+            return
+        except Exception as error:
+            print("warm-up failed, retrying:", str(error)[:80], flush=True)
+            time.sleep(10)
+
+
 def speed(model, count="10", gpu="L4"):
     llm = LLMS[model]()
-    llm.invoke("Reply OK")
+    warm_up(llm)
     times = []
     for c in list(load_contexts().values())[: int(count)]:
         start = time.time()
@@ -135,7 +149,7 @@ def score():
     qs = {q["id"]: q for q in questions()}
     ctx = load_contexts()
     table = {}
-    for folder in sorted(p for p in OUT.iterdir() if p.is_dir()):
+    for folder in sorted(p for p in OUT.iterdir() if p.is_dir() and p.name not in SKIP):
         runs = [load_run(p) for p in sorted(folder.glob("run?.jsonl"))]
         if not runs:
             continue
