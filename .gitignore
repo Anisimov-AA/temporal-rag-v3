@@ -21,3 +21,6 @@ project_map.html
 results.html
 dropped.html
 index/
+
+# course demo, kept local for now
+demo/
