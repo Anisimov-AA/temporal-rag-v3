@@ -13,7 +13,7 @@ SPLIT = ROOT / "dev" / "split.json"
 OUT = ROOT / "results" / "search_check.json"
 CANDIDATES = 20
 TOPS = [3, 5, 10]
-MODES = ["vectors", "vectors + bm25", "vectors + bm25 + rerank", "rerank + newest effective"]
+MODES = ["vectors", "vectors + rerank", "vectors + bm25", "vectors + bm25 + rerank", "rerank + newest effective"]
 WINDOW = 5
 
 
@@ -44,7 +44,7 @@ def ranked_lists(k, question, snapshot_id):
     words = k.keywords[snapshot_id].search(question, CANDIDATES)
     fused = fuse([vectors, words])
     reranked = rerank(question, fused)
-    return {"vectors": vectors, "vectors + bm25": fused, "vectors + bm25 + rerank": reranked,
+    return {"vectors": vectors, "vectors + rerank": rerank(question, vectors), "vectors + bm25": fused, "vectors + bm25 + rerank": reranked,
             "rerank + newest effective": newest_effective_first(reranked[:WINDOW]) + reranked[WINDOW:]}
 
 
