@@ -65,6 +65,7 @@ SECTIONS = [("step2", "Step 2 · Pick the LLM", ROOT / "results" / "tournament")
             ("top3", "Step 3 · 3 chunks", ROOT / "results" / "tournament" / "variants" / "top3"),
             ("top10", "Step 3 · 10 chunks", ROOT / "results" / "tournament" / "variants" / "top10"),
             ("top15", "Step 3 · 15 chunks", ROOT / "results" / "tournament" / "variants" / "top15"),
+            ("top10nodates", "Step 3 · 10 chunks, no date rule", ROOT / "results" / "tournament" / "variants" / "top10nodates"),
             ("norerank10", "Step 3 · 10 chunks, no rerank", ROOT / "results" / "tournament" / "variants" / "norerank10")]
 
 
