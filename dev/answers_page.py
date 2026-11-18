@@ -9,7 +9,7 @@ import tournament  # noqa: E402
 from steps.answer import Reply  # noqa: E402
 
 OUT = ROOT / "answers.html"
-NAMES = {"claude-opus": "Opus", "gcp_qwen3_32b": "Qwen3 32B", "gemini-3.5-flash-lite": "Flash-Lite",
+NAMES = {"claude-opus": "Opus 5.5", "gcp_qwen3_32b": "Qwen3 32B", "gemini-3.5-flash-lite": "Gemini 3.5 Flash-Lite",
          "gcp_qwen3.6_27b": "Qwen3.6 27B", "qwen3_8b": "Qwen3 8B", "gcp_gemma4_26b": "Gemma 4 26B",
          "gcp_mistral-small3.2_24b": "Mistral 3.2", "gcp_command-r_35b": "Command R", "gcp_qwen3.8_27b": "Qwen3.8 27B",
          "gcp_granite4.2_30b": "Granite 4.2", "gcp_llama3.3_70b": "Llama 3.3 70B"}
