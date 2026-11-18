@@ -97,7 +97,7 @@ class Knowledge:
         urls = [used.metadata["url"]]
         if self.config.get("sources") == "with_value":
             pages = [(c.metadata["url"], c.metadata["url"] + "\n" + c.page_content) for c in chunks]
-            urls += [u for u in with_value(reply.answer, pages) if u not in urls]
+            urls = list(dict.fromkeys(urls + with_value(reply.answer, pages)))
         return Answer(text=reply.answer, sources=[Source(url=u, snapshot_id=snapshot_id) for u in urls])
 
     def conflicts(self):
