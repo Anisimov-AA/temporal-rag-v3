@@ -38,6 +38,9 @@ details{border-bottom:1px solid var(--line)}
 .ans{display:flex;gap:8px;margin:4px 0}
 .ans .qc{width:52px}
 .ans b{font-weight:600;flex:none;width:72px}
+nav{margin-bottom:14px}
+.tab{display:inline-block;font-size:13px;color:var(--muted);text-decoration:none;margin-right:16px;padding-bottom:2px}
+.tab.on{color:var(--ink);border-bottom:2px solid var(--ink)}
 @media (max-width:600px){body{padding:20px 16px}.qt{width:200px}}
 """
 
@@ -58,31 +61,55 @@ def answer_text(d, context):
     return tournament.to_answer(Reply(**d["reply"]), context).text
 
 
-def main():
-    qs = tournament.questions()
-    ctx = tournament.load_contexts()
-    scores = json.loads((tournament.OUT / "scores.json").read_text(encoding="utf-8"))
-    order = sorted(scores, key=lambda m: -scores[m]["accuracy"])
-    MODELS = [(m, NAMES.get(m, m)) for m in order]
-    runs = {m: tournament.load_run(tournament.OUT / m / "run1.jsonl") for m, _ in MODELS}
-    head = '<div class="head"><i class="qt"></i>' + "".join(f'<i class="qh">{name}</i>' for _, name in MODELS) + "</div>"
+SECTIONS = [("step2", "Step 2 · LLM", ROOT / "results" / "tournament"),
+            ("top3", "Step 3 · top 3", ROOT / "results" / "tournament" / "variants" / "top3"),
+            ("top10", "Step 3 · top 10", ROOT / "results" / "tournament" / "variants" / "top10"),
+            ("norerank10", "Step 3 · no rerank, top 10", ROOT / "results" / "tournament" / "variants" / "norerank10")]
+
+
+def section(key, folder, qs):
+    scores_file = folder / "scores.json"
+    if not scores_file.exists():
+        return ""
+    ctx = {c["id"]: c for c in json.loads((folder / "contexts.json").read_text(encoding="utf-8"))}
+    scores = json.loads(scores_file.read_text(encoding="utf-8"))
+    models = [(m, NAMES.get(m, m)) for m in sorted(scores, key=lambda m: -scores[m]["accuracy"])]
+    runs = {m: tournament.load_run(folder / m / "run1.jsonl") for m, _ in models}
+    head = '<div class="head"><i class="qt"></i>' + "".join(f'<i class="qh">{name}</i>' for _, name in models) + "</div>"
     rows = []
     for q in qs:
-        chips = "".join(chip(scores[m]["questions"][q["id"]]) for m, _ in MODELS)
+        chips = "".join(chip(scores[m]["questions"][q["id"]]) for m, _ in models)
         date = f' · as of {q["as_of"]}' if q.get("as_of") else ""
         answers = "".join(
             f'<div class="ans">{chip(scores[m]["questions"][q["id"]])}<b>{name}</b>'
             f'<span>{html.escape(answer_text(runs[m].get(q["id"], {}), ctx[q["id"]]))}</span></div>'
-            for m, name in MODELS)
+            for m, name in models)
         must = f' · must include: {html.escape(", ".join(q["must_include"]))}' if q["must_include"] else ""
         rows.append(f'<details><summary class="qrow"><i class="qt"><u>{q["id"][4:]}</u>{html.escape(q["question"])}{date}</i>{chips}</summary>'
                     f'<div class="qd"><div class="qx">expected: {html.escape(q["expected_answer"])}{must}</div>{answers}</div></details>')
+    return f'<section id="{key}">{head}{"".join(rows)}</section>'
+
+
+def main():
+    qs = tournament.questions()
+    built = [(key, title, section(key, folder, qs)) for key, title, folder in SECTIONS]
+    built = [b for b in built if b[2]]
+    tabs = "".join(f'<a class="tab" href="#{key}">{title}</a>' for key, title, _ in built)
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Answers</title><style>{STYLE}</style></head>
 <body><h1>Answers</h1><p class="sub">30 tuning questions · score of each of the 3 runs (one number = the same in all 3) · click a question for the answers (run 1)</p>
-{head}{"".join(rows)}</body></html>"""
+<nav>{tabs}</nav>{"".join(s for _, _, s in built)}
+<script>
+function show() {{
+  const key = location.hash.slice(1) || "{built[0][0]}";
+  document.querySelectorAll("section").forEach(s => s.style.display = s.id === key ? "" : "none");
+  document.querySelectorAll(".tab").forEach(a => a.classList.toggle("on", a.getAttribute("href") === "#" + key));
+}}
+window.addEventListener("hashchange", show);
+show();
+</script></body></html>"""
     OUT.write_text(page, encoding="utf-8")
-    print("written", OUT)
+    print("written", OUT, "sections:", [k for k, _, _ in built])
 
 
 if __name__ == "__main__":
