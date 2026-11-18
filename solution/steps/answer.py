@@ -12,6 +12,7 @@ from pydantic import BaseModel, field_validator
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 GCP = os.getenv("GCP_OLLAMA", "http://localhost:11435")
+THREADS = int(os.getenv("OLLAMA_THREADS", "0")) or None
 
 GAPS = {"gemini-3.5-flash-lite": 4.5, "gemma-4-31b-it": 35, "llama3.1:8b": 0, "qwen3:8b": 0,
         "gcp:qwen3:32b": 0, "gcp:qwen3:30b-a3b": 0, "gcp:qwen3:30b-a3b-thinking": 0, "gcp:qwen3.6:35b-a3b": 0, "gcp:gpt-oss:20b": 0, "gcp:gemma4:31b": 0,
@@ -21,22 +22,22 @@ LLMS = {
     "gemma-4-31b-it": lambda: ChatGoogleGenerativeAI(model="gemma-4-31b-it", temperature=0, max_retries=4, api_key=KEY),
     "llama3.1:8b": lambda: ChatOllama(model="llama3.1:8b", temperature=0, seed=42, num_ctx=8192),
     "qwen3:8b": lambda: ChatOllama(model="qwen3:8b", temperature=0, seed=42, num_ctx=8192, reasoning=False),
-    "gcp:qwen3:32b": lambda: ChatOllama(model="qwen3:32b", base_url=GCP, temperature=0, seed=42, num_ctx=8192, reasoning=False),
-    "gcp:qwen3:30b-a3b": lambda: ChatOllama(model="qwen3:30b-a3b-instruct-2507-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024),
-    "gcp:qwen3:30b-a3b-thinking": lambda: ChatOllama(model="qwen3:30b-a3b-thinking-2507-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=16384,
+    "gcp:qwen3:32b": lambda: ChatOllama(model="qwen3:32b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, reasoning=False),
+    "gcp:qwen3:30b-a3b": lambda: ChatOllama(model="qwen3:30b-a3b-instruct-2507-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024),
+    "gcp:qwen3:30b-a3b-thinking": lambda: ChatOllama(model="qwen3:30b-a3b-thinking-2507-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=16384,
                                                      num_predict=4096, reasoning=True),
-    "gcp:qwen3.6:35b-a3b": lambda: ChatOllama(model="qwen3.6:35b-a3b", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024, reasoning=False),
-    "gcp:gpt-oss:20b": lambda: ChatOllama(model="gpt-oss:20b", base_url=GCP, temperature=0, seed=42, num_ctx=8192, reasoning="low"),
-    "gcp:gpt-oss:20b-medium": lambda: ChatOllama(model="gpt-oss:20b", base_url=GCP, temperature=0, seed=42, num_ctx=8192, reasoning="medium"),
-    "gcp:gemma4:31b": lambda: ChatOllama(model="gemma4:31b", base_url=GCP, temperature=0, seed=42, num_ctx=8192),
-    "gcp:qwen3.6:27b": lambda: ChatOllama(model="qwen3.6:27b-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024, reasoning=False),
-    "gcp:gemma4:26b": lambda: ChatOllama(model="gemma4:26b-a4b-it-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=16384, num_predict=1024, reasoning=False),
-    "gcp:mistral-small3.2:24b": lambda: ChatOllama(model="mistral-small3.2:24b-instruct-2506-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024),
-    "gcp:command-r:35b": lambda: ChatOllama(model="command-r:35b-08-2024-q4_K_M", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024),
-    "gcp:qwen3:8b": lambda: ChatOllama(model="qwen3:8b", base_url=GCP, temperature=0, seed=42, num_ctx=8192, reasoning=False),
-    "gcp:qwen3.8:27b": lambda: ChatOllama(model="qwen3.8:27b", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024, reasoning=False),
-    "gcp:granite4.2:30b": lambda: ChatOllama(model="granite4.2:30b", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024, reasoning=False),
-    "gcp:llama3.3:70b": lambda: ChatOllama(model="llama3.3:70b", base_url=GCP, temperature=0, seed=42, num_ctx=8192, num_predict=1024),
+    "gcp:qwen3.6:35b-a3b": lambda: ChatOllama(model="qwen3.6:35b-a3b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
+    "gcp:gpt-oss:20b": lambda: ChatOllama(model="gpt-oss:20b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, reasoning="low"),
+    "gcp:gpt-oss:20b-medium": lambda: ChatOllama(model="gpt-oss:20b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, reasoning="medium"),
+    "gcp:gemma4:31b": lambda: ChatOllama(model="gemma4:31b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192),
+    "gcp:qwen3.6:27b": lambda: ChatOllama(model="qwen3.6:27b-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
+    "gcp:gemma4:26b": lambda: ChatOllama(model="gemma4:26b-a4b-it-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=16384, num_predict=1024, reasoning=False),
+    "gcp:mistral-small3.2:24b": lambda: ChatOllama(model="mistral-small3.2:24b-instruct-2506-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024),
+    "gcp:command-r:35b": lambda: ChatOllama(model="command-r:35b-08-2024-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024),
+    "gcp:qwen3:8b": lambda: ChatOllama(model="qwen3:8b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, reasoning=False),
+    "gcp:qwen3.8:27b": lambda: ChatOllama(model="qwen3.8:27b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
+    "gcp:granite4.2:30b": lambda: ChatOllama(model="granite4.2:30b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
+    "gcp:llama3.3:70b": lambda: ChatOllama(model="llama3.3:70b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024),
 }
 DONT_KNOW = "I don't know. The Dupaco website does not say this. Please contact Dupaco and a member services rep can help."
 
