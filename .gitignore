@@ -24,3 +24,6 @@ index/
 
 # course demo, kept local for now
 demo/
+
+# cluster scripts, kept local
+hpc/
