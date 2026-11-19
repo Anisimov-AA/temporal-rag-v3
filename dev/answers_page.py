@@ -13,7 +13,9 @@ NAMES = {"claude-opus": "Opus 5.5", "gcp_qwen3_32b": "Qwen3 32B", "gemini-3.5-fl
          "gcp_qwen3.6_27b": "Qwen3.6 27B", "qwen3_8b": "Qwen3 8B", "gcp_gemma4_26b": "Gemma 4 26B",
          "gcp_mistral-small3.2_24b": "Mistral 3.2", "gcp_command-r_35b": "Command R", "gcp_qwen3.8_27b": "Qwen3.8 27B",
          "gcp_granite4.2_30b": "Granite 4.2", "gcp_llama3.3_70b": "Llama 3.3 70B", "gcp_qwen3_30b-a3b": "Qwen3 30B-A3B",
-         "gcp_gpt-oss_20b": "gpt-oss low", "gcp_gpt-oss_20b-medium": "gpt-oss medium"}
+         "gcp_gpt-oss_20b": "gpt-oss low", "gcp_gpt-oss_20b-medium": "gpt-oss medium",
+         "nvidia_nemotron-3.5-super": "Nemotron Super", "nvidia_nemotron-3.5-lightning": "Nemotron Lightning", "nvidia_nemotron-3-ultra": "Nemotron Ultra",
+         "nvidia_gemma-4-31b": "Gemma 4 31B", "nvidia_nemotron-3.5-bolt": "Nemotron Bolt", "nvidia_mistral-large-4": "Mistral Large 4", "nvidia_glm-5.3-flash": "GLM-5.3"}
 
 STYLE = """
 :root{--bg:#f6f8fa;--ink:#1f2328;--muted:#59636e;--line:#d1d9e0}
