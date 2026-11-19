@@ -41,7 +41,7 @@ LLMS = {
     "gcp:qwen3:8b": lambda: ChatOllama(model="qwen3:8b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, reasoning=False),
     "gcp:qwen3.8:27b": lambda: ChatOllama(model="qwen3.8:27b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
     "gcp:granite4.2:30b": lambda: ChatOllama(model="granite4.2:30b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
-    "nvidia:mistral-large-4": lambda: ChatOpenAI(model="mistralai/mistral-large-4-1t-a52b", base_url=NVIDIA, api_key=NVIDIA_KEY, temperature=0, seed=42, max_tokens=1024),
+    "nvidia:mistral-large-4": lambda: ChatOpenAI(model="mistralai/mistral-large-4-1t-a52b", base_url=NVIDIA, api_key=NVIDIA_KEY, temperature=0, seed=42, max_tokens=2048),
     "nvidia:glm-5.3-flash": lambda: ChatOpenAI(model="z-ai/glm-5.3-flash", base_url=NVIDIA, api_key=NVIDIA_KEY, temperature=0, seed=42, max_tokens=1024),
     "gcp:llama3.3:70b": lambda: ChatOllama(model="llama3.3:70b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024),
 }
