@@ -17,6 +17,9 @@ NAMES = {"claude-opus": "Opus 5.5", "gcp_qwen3_32b": "Qwen3 32B", "gemini-3.5-fl
          "nvidia_nemotron-3.5-super": "Nemotron Super", "nvidia_nemotron-3.5-lightning": "Nemotron Lightning", "nvidia_nemotron-3-ultra": "Nemotron Ultra",
          "nvidia_gemma-4-31b": "Gemma 4 31B", "nvidia_nemotron-3.5-bolt": "Nemotron Bolt", "nvidia_mistral-large-4": "Mistral Large 4", "nvidia_glm-5.3-flash": "GLM-5.3"}
 
+BROKEN = {"dup-005": "scorer gives 0 to any list", "dup-088": "key wants 2023, the site's latest is 2024",
+          "dup-049": "key ignores the HSA and money market tiers"}
+
 STYLE = """
 :root{--bg:#f6f8fa;--ink:#1f2328;--muted:#59636e;--line:#d1d9e0}
 *{box-sizing:border-box}
@@ -43,6 +46,7 @@ details{border-bottom:1px solid var(--line)}
 nav{margin-bottom:14px}
 .tab{display:inline-block;font-size:13px;color:var(--muted);text-decoration:none;margin-right:16px;padding-bottom:2px}
 .tab.on{color:var(--ink);border-bottom:2px solid var(--ink)}
+.broken .qrow{opacity:.45}.why{color:#9a6700;margin-bottom:6px}
 @media (max-width:600px){body{padding:20px 16px}.qt{width:200px}}
 """
 
@@ -68,7 +72,28 @@ SECTIONS = [("step2", "Step 2 · Pick the LLM", ROOT / "results" / "tournament")
             ("top10", "Step 3 · 10 chunks", ROOT / "results" / "tournament" / "variants" / "top10"),
             ("top15", "Step 3 · 15 chunks", ROOT / "results" / "tournament" / "variants" / "top15"),
             ("top10nodates", "Step 3 · 10 chunks, no date rule", ROOT / "results" / "tournament" / "variants" / "top10nodates"),
-            ("norerank10", "Step 3 · 10 chunks, no rerank", ROOT / "results" / "tournament" / "variants" / "norerank10")]
+            ("norerank10", "Step 3 · 10 chunks, no rerank", ROOT / "results" / "tournament" / "variants" / "norerank10"),
+            ("closest10", "Step 4 · closest", ROOT / "results" / "tournament" / "variants" / "closest10"),
+            ("closest10nodates", "Step 4 · closest (Qwen)", ROOT / "results" / "tournament" / "variants" / "closest10nodates"),
+            ("conflictshot10", "Step 4 · example", ROOT / "results" / "tournament" / "variants" / "conflictshot10"),
+            ("conflictshot10nodates", "Step 4 · example (Qwen)", ROOT / "results" / "tournament" / "variants" / "conflictshot10nodates"),
+            ("checklist10", "Step 4 · checklist", ROOT / "results" / "tournament" / "variants" / "checklist10"),
+            ("checklist10nodates", "Step 4 · checklist (Qwen)", ROOT / "results" / "tournament" / "variants" / "checklist10nodates"),
+            ("labels10", "Step 4 · labels", ROOT / "results" / "tournament" / "variants" / "labels10"),
+            ("labels10nodates", "Step 4 · labels (Qwen)", ROOT / "results" / "tournament" / "variants" / "labels10nodates"),
+            ("short10", "Step 4 · short", ROOT / "results" / "tournament" / "variants" / "short10"),
+            ("short10nodates", "Step 4 · short (Qwen)", ROOT / "results" / "tournament" / "variants" / "short10nodates"),
+            ("checklistshot10", "Step 4 · checklist + example", ROOT / "results" / "tournament" / "variants" / "checklistshot10"),
+            ("strict10", "Step 4 · strict", ROOT / "results" / "tournament" / "variants" / "strict10"),
+            ("strict10nodates", "Step 4 · strict (Qwen)", ROOT / "results" / "tournament" / "variants" / "strict10nodates"),
+            ("varies10", "Step 4 · varies", ROOT / "results" / "tournament" / "variants" / "varies10"),
+            ("varies10nodates", "Step 4 · varies (Qwen)", ROOT / "results" / "tournament" / "variants" / "varies10nodates"),
+            ("latest10", "Step 4 · latest", ROOT / "results" / "tournament" / "variants" / "latest10"),
+            ("latest10nodates", "Step 4 · latest (Qwen)", ROOT / "results" / "tournament" / "variants" / "latest10nodates"),
+            ("cot10", "Step 4 · chain of thought", ROOT / "results" / "tournament" / "variants" / "cot10"),
+            ("cot10nodates", "Step 4 · chain of thought (Qwen)", ROOT / "results" / "tournament" / "variants" / "cot10nodates"),
+            ("latestchecklist10", "Step 4 · latest + checklist", ROOT / "results" / "tournament" / "variants" / "latestchecklist10"),
+            ("variesclosest10", "Step 4 · varies + closest", ROOT / "results" / "tournament" / "variants" / "variesclosest10")]
 
 
 def section(key, folder, qs):
@@ -89,8 +114,12 @@ def section(key, folder, qs):
             f'<span>{html.escape(answer_text(runs[m].get(q["id"], {}), ctx[q["id"]]))}</span></div>'
             for m, name in models)
         must = f' · must include: {html.escape(", ".join(q["must_include"]))}' if q["must_include"] else ""
-        rows.append(f'<details><summary class="qrow"><i class="qt"><u>{q["id"][4:]}</u>{html.escape(q["question"])}{date}</i>{chips}</summary>'
-                    f'<div class="qd"><div class="qx">expected: {html.escape(q["expected_answer"])}{must}</div>{answers}</div></details>')
+        broken = BROKEN.get(q["id"])
+        cls = ' class="broken"' if broken else ""
+        why = f' title="answer-key problem: {html.escape(broken)}"' if broken else ""
+        note = f'<div class="why">answer-key problem: {html.escape(broken)}</div>' if broken else ""
+        rows.append(f'<details{cls}><summary class="qrow"><i class="qt"{why}><u>{q["id"][4:]}</u>{html.escape(q["question"])}{date}</i>{chips}</summary>'
+                    f'<div class="qd">{note}<div class="qx">expected: {html.escape(q["expected_answer"])}{must}</div>{answers}</div></details>')
     return f'<section id="{key}">{head}{"".join(rows)}</section>'
 
 
@@ -101,7 +130,7 @@ def main():
     tabs = "".join(f'<a class="tab" href="#{key}">{title}</a>' for key, title, _ in built)
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Answers</title><style>{STYLE}</style></head>
-<body><h1>Answers</h1><p class="sub">30 tuning questions · score of each of the 3 runs (one number = the same in all 3) · click a question for the answers (run 1)</p>
+<body><h1>Answers</h1><p class="sub">30 tuning questions · score of each of the 3 runs (one number = the same in all 3) · click a question for the answers (run 1) · grey = answer-key problem, no model can score</p>
 <nav>{tabs}</nav>{"".join(s for _, _, s in built)}
 <script>
 function show() {{
