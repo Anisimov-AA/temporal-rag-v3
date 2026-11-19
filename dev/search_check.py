@@ -6,7 +6,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "harness"), str(ROOT / "solution")]
 import solution  # noqa: E402
 from run_eval import load_snapshots  # noqa: E402
-from steps.search import fuse, newest_effective_first, rerank  # noqa: E402
+from retrieval.reorder_by_date import reorder_by_date as newest_effective_first  # noqa: E402
+from retrieval.rerank_chunks import rerank_chunks as rerank  # noqa: E402
+from retrieval.retrieve_chunks import fuse  # noqa: E402
 
 QUESTIONS = ROOT / "eval" / "public_eval.jsonl"
 SPLIT = ROOT / "dev" / "split.json"
@@ -52,7 +54,7 @@ def main():
     tuning = set(json.loads(SPLIT.read_text(encoding="utf-8"))["tuning"])
     questions = [json.loads(line) for line in QUESTIONS.read_text(encoding="utf-8").splitlines() if line.strip()]
     asked = [q for q in questions if q["id"] in tuning and q["must_include"]]
-    k = solution.build({**solution.CONFIG, "llm": "llama3.1:8b"})
+    k = solution.build({**solution.CONFIG, "llm": "gemini-3.5-flash-lite"})
     for snapshot in load_snapshots(ROOT / "snapshots"):
         k.ingest(snapshot)
     rows = []
@@ -66,6 +68,7 @@ def main():
             }
         rows.append(row)
         print(f"{n}/{len(asked)} {q['id']}", flush=True)
+    OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps({"questions": len(asked), "rows": rows}, ensure_ascii=False, indent=1), encoding="utf-8")
     print()
     for mode in MODES:

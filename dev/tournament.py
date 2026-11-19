@@ -8,29 +8,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "harness"), str(ROOT / "solution")]
 import solution  # noqa: E402
-from contract import Answer, Source  # noqa: E402
+from contract import Answer  # noqa: E402
 from scoring import score_item  # noqa: E402
-from langchain_core.output_parsers import JsonOutputParser  # noqa: E402
-from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, VALUE, Reply, excerpts, kind, with_value  # noqa: E402
+from generation.ask_the_llm import GAPS, LLMS, Reply, parse_reply  # noqa: E402
+from generation.write_the_prompt import write_the_prompt  # noqa: E402
+from solution import DONT_KNOW  # noqa: E402
 
 QUESTIONS = ROOT / "eval" / "public_eval.jsonl"
 SPLIT = ROOT / "dev" / "split.json"
-VARIANTS = {"base": {}, "top3": {"top_k": 3}, "top10": {"top_k": 10}, "top15": {"top_k": 15}, "top10nodates": {"top_k": 10, "dates": "none"}, "norerank10": {"search": "vectors + bm25", "top_k": 10}}
-STEP4 = {"closest": {"prompt": "closest"}, "conflictshot": {"prompt": "only_conflict_shot"}, "checklist": {"prompt": "only_checklist"},
-         "labels": {"excerpts": "labeled"}, "short": {"prompt": "only_short"},
-         "checklistshot": {"prompt": "checklist_shot"},
-         "strict": {"prompt": "only_strict"}, "varies": {"prompt": "only_varies"}, "latest": {"prompt": "only_latest"},
-         "cot": {"prompt": "chain_of_thought"},
-         "latestchecklist": {"prompt": "latest_checklist"}, "variesclosest": {"prompt": "varies_closest"},
-         "clear": {"prompt": "only_clear"}, "variesclear": {"prompt": "varies_clear"}, "closestclear": {"prompt": "closest_clear"}}
-VARIANTS.update({f"{name}10": {"top_k": 10, **change} for name, change in STEP4.items()})
-VARIANTS.update({f"{name}10nodates": {"top_k": 10, "dates": "none", **change} for name, change in STEP4.items()})
-VARIANT = os.getenv("VARIANT", "base")
-OUT = ROOT / "results" / "tournament" if VARIANT == "base" else ROOT / "results" / "tournament" / "variants" / VARIANT
+VARIANTS = {"step2": {}}
+VARIANT = os.getenv("VARIANT", "step2")
+OUT = ROOT / "results" / "tournament" / "variants" / VARIANT
 CONTEXTS = OUT / "contexts.json"
-CONFIG = {**solution.CONFIG, "prompt": "plain", "top_k": 5, **VARIANTS[VARIANT]}
-SKIP = {"speed", "variants"}
+CONFIG = {**solution.CONFIG, **VARIANTS[VARIANT]}
+SKIP = {"speed"}
 AGENT_PARTS = 3
+VALUE = re.compile(r"\d[\d,]*(?:\.\d+)?%?|\d{1,2}:\d{2}")
 
 
 def questions():
@@ -42,42 +35,19 @@ def questions():
 def contexts():
     from run_eval import load_snapshots
 
-    k = solution.build({**CONFIG, "llm": "llama3.1:8b"})
+    k = solution.build({**CONFIG, "llm": "gemini-3.5-flash-lite"})
     for snapshot in load_snapshots(ROOT / "snapshots"):
         k.ingest(snapshot)
     items = []
     for q in questions():
         snapshot_id = k.pick(q.get("as_of"))
         chunks = k.search(q["question"], snapshot_id)
-        today = k.dates[snapshot_id]
-        prompt = PROMPTS[CONFIG["prompt"]].format(excerpts=excerpts(chunks, CONFIG.get("excerpts", "score"), today), question=q["question"], today=today)
+        prompt = write_the_prompt(CONFIG["prompt"], q["question"], chunks)
         items.append({"id": q["id"], "snapshot_id": snapshot_id, "prompt": prompt,
                       "chunks": [{"url": c.metadata["url"], "text": c.page_content} for c in chunks]})
     OUT.mkdir(parents=True, exist_ok=True)
     CONTEXTS.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
     print(len(items), "prompts saved")
-
-
-HEADER = re.compile(r"^\[(\d+)\] (\S+) · (\S+)$", re.M)
-
-
-def from_step3():
-    from run_eval import load_snapshots
-
-    dates = {s.snapshot_id: s.taken_on for s in load_snapshots(ROOT / "snapshots")}
-    base = "top10nodates" if CONFIG.get("dates") == "none" else "top10"
-    items = json.loads((ROOT / "results" / "tournament" / "variants" / base / "contexts.json").read_text(encoding="utf-8"))
-    for c in items:
-        head, rest = c["prompt"].split("Website excerpts:\n\n", 1)
-        text, question = rest.split("\n\nMember question: ", 1)
-        question = question.split("\n\nReply as JSON", 1)[0]
-        today = dates[c["snapshot_id"]]
-        if CONFIG.get("excerpts") == "labeled":
-            text = HEADER.sub(lambda m: f"[{m[1]}] {kind(m[2])} · {'page as of' if m[3] == today else 'published'} {m[3]} · {m[2]}", text)
-        c["prompt"] = PROMPTS[CONFIG["prompt"]].format(excerpts=text, question=question, today=today)
-    OUT.mkdir(parents=True, exist_ok=True)
-    CONTEXTS.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(len(items), "prompts saved from", base)
 
 
 def load_contexts():
@@ -97,6 +67,16 @@ def model_seconds(message):
     return round((meta["total_duration"] - meta.get("load_duration", 0)) / 1e9, 1)
 
 
+def warm_up(llm, tries=5):
+    for _ in range(tries):
+        try:
+            llm.invoke("Reply OK")
+            return
+        except Exception as error:
+            print("warm-up failed, retrying:", str(error)[:80], flush=True)
+            time.sleep(10)
+
+
 def run(model, runs="3", first="1"):
     llm = LLMS[model]()
     gap = GAPS[model]
@@ -111,23 +91,13 @@ def run(model, runs="3", first="1"):
             start = last = time.time()
             try:
                 message = llm.invoke(c["prompt"])
-                r = Reply(**JsonOutputParser().invoke(message))
-                lines.append({"id": c["id"], "reply": r.model_dump(), "seconds": round(time.time() - start, 1),
+                r = parse_reply(message.content)
+                lines.append({"id": c["id"], "raw": message.content, "reply": r.model_dump(), "seconds": round(time.time() - start, 1),
                               "model_seconds": model_seconds(message)})
             except Exception as error:
                 lines.append({"id": c["id"], "error": str(error)[:200], "seconds": round(time.time() - start, 1)})
             print(f"run {n} {c['id']} {lines[-1]['seconds']} s", flush=True)
         (folder / f"run{n}.jsonl").write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in lines), encoding="utf-8")
-
-
-def warm_up(llm, tries=5):
-    for _ in range(tries):
-        try:
-            llm.invoke("Reply OK")
-            return
-        except Exception as error:
-            print("warm-up failed, retrying:", str(error)[:80], flush=True)
-            time.sleep(10)
 
 
 def speed(model, count="10", gpu="L4"):
@@ -158,14 +128,10 @@ def agent_prompts():
     print("prompts for the agents in", folder)
 
 
-def to_answer(r, context):
+def to_answer(r):
     if not r.known:
         return Answer(text=DONT_KNOW, confident=False)
-    chunks = context["chunks"]
-    used = chunks[r.source - 1] if 1 <= r.source <= len(chunks) else chunks[0]
-    pages = [(c["url"], c["url"] + "\n" + c["text"]) for c in chunks]
-    urls = list(dict.fromkeys([used["url"]] + with_value(r.answer, pages)))
-    return Answer(text=r.answer, sources=[Source(url=u, snapshot_id=context["snapshot_id"]) for u in urls])
+    return Answer(text=r.answer)
 
 
 def load_run(path):
@@ -179,7 +145,6 @@ def load_run(path):
 
 def score():
     qs = {q["id"]: q for q in questions()}
-    ctx = load_contexts()
     table = {}
     for folder in sorted(p for p in OUT.iterdir() if p.is_dir() and p.name not in SKIP):
         runs = [load_run(p) for p in sorted(folder.glob("run?.jsonl"))]
@@ -190,7 +155,7 @@ def score():
             total = weight = 0
             for qid, q in qs.items():
                 d = rows.get(qid, {})
-                ans = to_answer(Reply(**d["reply"]), ctx[qid]) if "reply" in d else Answer(text="", confident=False)
+                ans = to_answer(Reply(**d["reply"])) if "reply" in d else Answer(text="", confident=False)
                 s = score_item(q, ans)
                 total += s["score"] * q["weight"]
                 weight += q["weight"]
@@ -215,4 +180,4 @@ def score():
 
 if __name__ == "__main__":
     command, args = sys.argv[1], sys.argv[2:]
-    {"contexts": contexts, "from_step3": from_step3, "run": run, "speed": speed, "agent_prompts": agent_prompts, "score": score}[command](*args)
+    {"contexts": contexts, "run": run, "speed": speed, "agent_prompts": agent_prompts, "score": score}[command](*args)
