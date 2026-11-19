@@ -166,6 +166,13 @@ VARIES = ("If the value differs by branch or by account, give the most common on
           "then ask which one the member means. Do not answer only that it varies.\n")
 LATEST = ("If a number grows over time (awards, counts, years in a row), give the latest one from the newest excerpt, "
           "not a list of the older ones.\n")
+CLEAR = ("Start with the current value for the date of the question in one sentence. "
+         "Do not list older values unless the member asks about the past. "
+         "If the question asks for several products, terms or rates, give every one from the excerpts as a short list. "
+         "No headings, no bold, nothing the member did not ask for.\n")
+ONLY_CLEAR = plain_plus(CLEAR)
+VARIES_CLEAR = plain_plus(VARIES + CLEAR)
+CLOSEST_CLEAR = CLOSEST.replace(TOP, TOP + CLEAR, 1)
 ONLY_VARIES = plain_plus(VARIES)
 ONLY_LATEST = plain_plus(LATEST)
 LATEST_CHECKLIST = ONLY_CHECKLIST.replace(TOP, TOP + LATEST, 1)
@@ -179,7 +186,7 @@ PROMPTS = {"plain": PLAIN, "chain_of_thought": CHAIN_OF_THOUGHT, "site_words": S
            "newest": NEWEST, "combine": COMBINE, "today": TODAY, "max": MAX,
            "only_conflict_shot": ONLY_CONFLICT_SHOT, "only_checklist": ONLY_CHECKLIST, "only_short": ONLY_SHORT, "checklist_shot": CHECKLIST_SHOT,
            "only_varies": ONLY_VARIES, "only_latest": ONLY_LATEST,
-           "latest_checklist": LATEST_CHECKLIST, "varies_closest": VARIES_CLOSEST}
+           "latest_checklist": LATEST_CHECKLIST, "varies_closest": VARIES_CLOSEST, "only_clear": ONLY_CLEAR, "varies_clear": VARIES_CLEAR, "closest_clear": CLOSEST_CLEAR}
 
 
 class Reply(BaseModel):
