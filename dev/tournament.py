@@ -21,7 +21,8 @@ STEP4 = {"closest": {"prompt": "closest"}, "conflictshot": {"prompt": "only_conf
          "checklistshot": {"prompt": "checklist_shot"},
          "strict": {"prompt": "only_strict"}, "varies": {"prompt": "only_varies"}, "latest": {"prompt": "only_latest"},
          "cot": {"prompt": "chain_of_thought"},
-         "latestchecklist": {"prompt": "latest_checklist"}, "variesclosest": {"prompt": "varies_closest"}}
+         "latestchecklist": {"prompt": "latest_checklist"}, "variesclosest": {"prompt": "varies_closest"},
+         "clear": {"prompt": "only_clear"}, "variesclear": {"prompt": "varies_clear"}, "closestclear": {"prompt": "closest_clear"}}
 VARIANTS.update({f"{name}10": {"top_k": 10, **change} for name, change in STEP4.items()})
 VARIANTS.update({f"{name}10nodates": {"top_k": 10, "dates": "none", **change} for name, change in STEP4.items()})
 VARIANT = os.getenv("VARIANT", "base")
