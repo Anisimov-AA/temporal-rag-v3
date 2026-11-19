@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -10,11 +11,19 @@ import solution  # noqa: E402
 from contract import Answer, Source  # noqa: E402
 from scoring import score_item  # noqa: E402
 from langchain_core.output_parsers import JsonOutputParser  # noqa: E402
-from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, VALUE, Reply, excerpts, with_value  # noqa: E402
+from steps.answer import DONT_KNOW, GAPS, LLMS, PROMPTS, VALUE, Reply, excerpts, kind, with_value  # noqa: E402
 
 QUESTIONS = ROOT / "eval" / "public_eval.jsonl"
 SPLIT = ROOT / "dev" / "split.json"
 VARIANTS = {"base": {}, "top3": {"top_k": 3}, "top10": {"top_k": 10}, "top15": {"top_k": 15}, "top10nodates": {"top_k": 10, "dates": "none"}, "norerank10": {"search": "vectors + bm25", "top_k": 10}}
+STEP4 = {"closest": {"prompt": "closest"}, "conflictshot": {"prompt": "only_conflict_shot"}, "checklist": {"prompt": "only_checklist"},
+         "labels": {"excerpts": "labeled"}, "short": {"prompt": "only_short"},
+         "checklistshot": {"prompt": "checklist_shot"},
+         "strict": {"prompt": "only_strict"}, "varies": {"prompt": "only_varies"}, "latest": {"prompt": "only_latest"},
+         "cot": {"prompt": "chain_of_thought"},
+         "latestchecklist": {"prompt": "latest_checklist"}, "variesclosest": {"prompt": "varies_closest"}}
+VARIANTS.update({f"{name}10": {"top_k": 10, **change} for name, change in STEP4.items()})
+VARIANTS.update({f"{name}10nodates": {"top_k": 10, "dates": "none", **change} for name, change in STEP4.items()})
 VARIANT = os.getenv("VARIANT", "base")
 OUT = ROOT / "results" / "tournament" if VARIANT == "base" else ROOT / "results" / "tournament" / "variants" / VARIANT
 CONTEXTS = OUT / "contexts.json"
@@ -40,12 +49,34 @@ def contexts():
         snapshot_id = k.pick(q.get("as_of"))
         chunks = k.search(q["question"], snapshot_id)
         today = k.dates[snapshot_id]
-        prompt = PROMPTS[CONFIG["prompt"]].format(excerpts=excerpts(chunks), question=q["question"], today=today)
+        prompt = PROMPTS[CONFIG["prompt"]].format(excerpts=excerpts(chunks, CONFIG.get("excerpts", "score"), today), question=q["question"], today=today)
         items.append({"id": q["id"], "snapshot_id": snapshot_id, "prompt": prompt,
                       "chunks": [{"url": c.metadata["url"], "text": c.page_content} for c in chunks]})
     OUT.mkdir(parents=True, exist_ok=True)
     CONTEXTS.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
     print(len(items), "prompts saved")
+
+
+HEADER = re.compile(r"^\[(\d+)\] (\S+) · (\S+)$", re.M)
+
+
+def from_step3():
+    from run_eval import load_snapshots
+
+    dates = {s.snapshot_id: s.taken_on for s in load_snapshots(ROOT / "snapshots")}
+    base = "top10nodates" if CONFIG.get("dates") == "none" else "top10"
+    items = json.loads((ROOT / "results" / "tournament" / "variants" / base / "contexts.json").read_text(encoding="utf-8"))
+    for c in items:
+        head, rest = c["prompt"].split("Website excerpts:\n\n", 1)
+        text, question = rest.split("\n\nMember question: ", 1)
+        question = question.split("\n\nReply as JSON", 1)[0]
+        today = dates[c["snapshot_id"]]
+        if CONFIG.get("excerpts") == "labeled":
+            text = HEADER.sub(lambda m: f"[{m[1]}] {kind(m[2])} · {'page as of' if m[3] == today else 'published'} {m[3]} · {m[2]}", text)
+        c["prompt"] = PROMPTS[CONFIG["prompt"]].format(excerpts=text, question=question, today=today)
+    OUT.mkdir(parents=True, exist_ok=True)
+    CONTEXTS.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(len(items), "prompts saved from", base)
 
 
 def load_contexts():
@@ -183,4 +214,4 @@ def score():
 
 if __name__ == "__main__":
     command, args = sys.argv[1], sys.argv[2:]
-    {"contexts": contexts, "run": run, "speed": speed, "agent_prompts": agent_prompts, "score": score}[command](*args)
+    {"contexts": contexts, "from_step3": from_step3, "run": run, "speed": speed, "agent_prompts": agent_prompts, "score": score}[command](*args)
