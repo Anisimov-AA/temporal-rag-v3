@@ -20,7 +20,8 @@ NVIDIA_KEY = os.getenv("NVIDIA_API_KEY")
 GAPS = {"gemini-3.5-flash-lite": 4.5, "gemma-4-31b-it": 35, "llama3.1:8b": 0, "qwen3:8b": 0,
         "gcp:qwen3:32b": 0, "gcp:qwen3:30b-a3b": 0, "gcp:qwen3:30b-a3b-thinking": 0, "gcp:qwen3.6:35b-a3b": 0, "gcp:gpt-oss:20b": 0, "gcp:gemma4:31b": 0,
         "gcp:qwen3.6:27b": 0, "gcp:gemma4:26b": 0, "gcp:mistral-small3.2:24b": 0, "gcp:command-r:35b": 0, "gcp:llama3.3:70b": 0, "gcp:qwen3:8b": 0, "gcp:gpt-oss:20b-medium": 0, "gcp:qwen3.8:27b": 0, "gcp:granite4.2:30b": 0,
-        "nvidia:mistral-large-4": 1.6, "nvidia:glm-5.3-flash": 1.6, "nvidia:nemotron-3.5-lightning": 1.6}
+        "nvidia:mistral-large-4": 1.6, "nvidia:glm-5.3-flash": 1.6, "nvidia:nemotron-3.5-lightning": 1.6,
+        "nvidia:nemotron-3.5-super": 1.6, "nvidia:nemotron-3-ultra": 1.6, "nvidia:gemma-4-31b": 1.6, "nvidia:nemotron-3.5-bolt": 1.6}
 LLMS = {
     "gemini-3.5-flash-lite": lambda: ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", temperature=0, max_retries=0, api_key=KEY),
     "gemma-4-31b-it": lambda: ChatGoogleGenerativeAI(model="gemma-4-31b-it", temperature=0, max_retries=4, api_key=KEY),
@@ -44,6 +45,10 @@ LLMS = {
     "nvidia:mistral-large-4": lambda: ChatOpenAI(model="mistralai/mistral-large-4-1t-a52b", base_url=NVIDIA, api_key=NVIDIA_KEY, temperature=0, seed=42, max_tokens=2048),
     "nvidia:glm-5.3-flash": lambda: ChatOpenAI(model="z-ai/glm-5.3-flash", base_url=NVIDIA, api_key=NVIDIA_KEY, temperature=0, seed=42, max_tokens=1024),
     "nvidia:nemotron-3.5-lightning": lambda: ChatOpenAI(model="nvidia/nemotron-3.5-lightning-30b-a3b", base_url=NVIDIA, api_key=NVIDIA_KEY, temperature=0, seed=42, max_tokens=2048, extra_body={"chat_template_kwargs": {"enable_thinking": False}}),
+    "nvidia:nemotron-3.5-super": lambda: ChatOpenAI(model="nvidia/nemotron-3.5-super-vl-120b-a12b", base_url=NVIDIA, api_key=NVIDIA_KEY, temperature=0, seed=42, max_tokens=2048, extra_body={"chat_template_kwargs": {"enable_thinking": False}}),
+    "nvidia:nemotron-3-ultra": lambda: ChatOpenAI(model="nvidia/nemotron-3-ultra-550b-a55b", base_url=NVIDIA, api_key=NVIDIA_KEY, temperature=0, seed=42, max_tokens=2048, extra_body={"chat_template_kwargs": {"enable_thinking": False}}),
+    "nvidia:gemma-4-31b": lambda: ChatOpenAI(model="google/gemma-4-31b-it", base_url=NVIDIA, api_key=NVIDIA_KEY, temperature=0, seed=42, max_tokens=2048, extra_body={"chat_template_kwargs": {"enable_thinking": False}}),
+    "nvidia:nemotron-3.5-bolt": lambda: ChatOpenAI(model="nvidia/nemotron-3.5-bolt-e4b", base_url=NVIDIA, api_key=NVIDIA_KEY, temperature=0, seed=42, max_tokens=2048, extra_body={"chat_template_kwargs": {"enable_thinking": False}}),
     "gcp:llama3.3:70b": lambda: ChatOllama(model="llama3.3:70b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024),
 }
 DONT_KNOW = "I don't know. The Dupaco website does not say this. Please contact Dupaco and a member services rep can help."
