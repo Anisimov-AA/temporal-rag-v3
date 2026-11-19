@@ -1,29 +1,10 @@
-# python
-__pycache__/
-*.pyc
-.venv/
+# everything kept local
+archive/
 
-# secrets
+# must never be pushed: keys, the Python env, the site data and what is built from it
 .env
-
-# data
-snapshots_zip/
+.venv/
+__pycache__/
 snapshots/0*/
-*.pdf
-
-# scorer output
-results/
-debug/
-
-# os
-.DS_Store
-project_map.html
-results.html
-dropped.html
 index/
-
-# course demo, kept local for now
-demo/
-
-# cluster scripts, kept local
-hpc/
+results/
