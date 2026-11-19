@@ -143,10 +143,43 @@ MAX = (QUOTE.replace(TOP, TOP + "Today is {today}.\n"
                          "Build the answer from every excerpt that has a part of it, not from one excerpt only.\n", 1)
        .replace("Website excerpts:\n", EXAMPLES + "Website excerpts:\n", 1))
 
+CONFLICT_EXAMPLES = """Example 1
+Excerpt [1] a news post · published 2023-05-02: "The X certificate now earns N1% APY."
+Excerpt [2] rates page · page as of 2025-01-10: "X certificate: N2% APY."
+Question: What is the rate on the X certificate?
+Reply: {{"analysis": "Two rates. The rates page is newer and official, the news post is old.", "answer": "The X certificate earns N2% APY.", "source": 2, "known": true}}
+
+Example 2
+Excerpt [1] rates page: "Y savings: $0-$999 N1% APY; $1,000-$9,999 N2% APY; $10,000+ N3% APY."
+Question: What rate do I get on Y savings with $5,000?
+Reply: {{"analysis": "The rate depends on the balance. $5,000 is in the $1,000-$9,999 tier.", "answer": "With $5,000, Y savings earns N2% APY.", "source": 1, "known": true}}
+
+"""
+
+ONLY_CONFLICT_SHOT = PLAIN.replace("Website excerpts:\n", CONFLICT_EXAMPLES + "Website excerpts:\n", 1)
+ONLY_CHECKLIST = plain_plus("In analysis, check in this order:\n"
+                            "1. What exactly is asked: the product, the term or tier, the branch, the date.\n"
+                            "2. Which excerpts give a value for exactly that.\n"
+                            "3. If they disagree, which one is newer or is the official rates page.\n"
+                            "4. Whether the value is for the exact product and tier asked, not a similar one.\n")
+VARIES = ("If the value differs by branch or by account, give the most common one and the other ones from the excerpts, "
+          "then ask which one the member means. Do not answer only that it varies.\n")
+LATEST = ("If a number grows over time (awards, counts, years in a row), give the latest one from the newest excerpt, "
+          "not a list of the older ones.\n")
+ONLY_VARIES = plain_plus(VARIES)
+ONLY_LATEST = plain_plus(LATEST)
+LATEST_CHECKLIST = ONLY_CHECKLIST.replace(TOP, TOP + LATEST, 1)
+VARIES_CLOSEST = CLOSEST.replace(TOP, TOP + VARIES, 1)
+CHECKLIST_SHOT =ONLY_CHECKLIST.replace("Website excerpts:\n", CONFLICT_EXAMPLES + "Website excerpts:\n", 1)
+ONLY_SHORT = plain_plus("Answer in one or two short sentences with the one value asked for.\n")
+
 PROMPTS = {"plain": PLAIN, "chain_of_thought": CHAIN_OF_THOUGHT, "site_words": SITE_WORDS, "closest": CLOSEST,
            "closest_strict": CLOSEST_STRICT, "looking_for": LOOKING_FOR, "quote": QUOTE, "few_shot": FEW_SHOT,
            "only_strict": ONLY_STRICT, "only_looking_for": ONLY_LOOKING_FOR, "only_quote": ONLY_QUOTE, "only_few_shot": ONLY_FEW_SHOT,
-           "newest": NEWEST, "combine": COMBINE, "today": TODAY, "max": MAX}
+           "newest": NEWEST, "combine": COMBINE, "today": TODAY, "max": MAX,
+           "only_conflict_shot": ONLY_CONFLICT_SHOT, "only_checklist": ONLY_CHECKLIST, "only_short": ONLY_SHORT, "checklist_shot": CHECKLIST_SHOT,
+           "only_varies": ONLY_VARIES, "only_latest": ONLY_LATEST,
+           "latest_checklist": LATEST_CHECKLIST, "varies_closest": VARIES_CLOSEST}
 
 
 class Reply(BaseModel):
@@ -187,19 +220,25 @@ def kind(url):
     return next((name for part, name in KINDS if part in url), "page")
 
 
-def newest_first(pieces, today):
-    ordered = sorted(pieces, key=lambda p: p[1], reverse=True)
+def labeled(pieces, today):
     parts = []
-    for n, (url, date, text) in enumerate(ordered, 1):
+    for n, (url, date, text) in enumerate(pieces, 1):
         when = f"page as of {date}" if date == today else f"published {date}"
         parts.append(f"[{n}] {kind(url)} · {when} · {url}\n{text}")
-    return "\n\n".join(parts), [url for url, _, _ in ordered]
+    return "\n\n".join(parts)
+
+
+def newest_first(pieces, today):
+    ordered = sorted(pieces, key=lambda p: p[1], reverse=True)
+    return labeled(ordered, today), [url for url, _, _ in ordered]
 
 
 def excerpts(chunks, order="score", today=""):
     pieces = [(c.metadata["url"], c.metadata.get("published") or c.metadata["taken_on"], c.page_content) for c in chunks]
     if order == "newest":
         return newest_first(pieces, today)[0]
+    if order == "labeled":
+        return labeled(pieces, today)
     return "\n\n".join(f"[{n}] {url} · {date}\n{text}" for n, (url, date, text) in enumerate(pieces, 1))
 
 
