@@ -1,9 +1,11 @@
 import hashlib
 import json
+import re
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
+from rank_bm25 import BM25Okapi
 
 BATCH = 64
 EMBEDDINGS = {
@@ -56,3 +58,21 @@ def build_index(docs, name, embeddings, folder):
     for start in range(0, len(docs), BATCH):
         store.add_documents(docs[start : start + BATCH], ids=ids[start : start + BATCH])
     return store, "built"
+
+
+WORD = re.compile(r"[a-z0-9]+(?:\.[0-9]+)?")
+
+
+def words(text):
+    return WORD.findall(text.lower())
+
+
+class Keywords:
+    def __init__(self, docs):
+        self.docs = docs
+        self.bm25 = BM25Okapi([words(doc.page_content) for doc in docs])
+
+    def search(self, question, k):
+        scores = self.bm25.get_scores(words(question))
+        best = sorted(range(len(self.docs)), key=lambda i: scores[i], reverse=True)[:k]
+        return [self.docs[i] for i in best]

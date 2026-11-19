@@ -1,7 +1,7 @@
 from langchain_core.documents import Document
 
 
-def to_documents(snapshot):
+def load_pages(snapshot):
     docs = []
     for page in snapshot.pages:
         docs.append(

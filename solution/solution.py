@@ -2,19 +2,21 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "harness"))
-from contract import Answer, Snapshot, Source  # noqa: E402
-from steps.answer import DONT_KNOW, GAPS, LLMS, ask, with_value  # noqa: E402
-from steps.clean import clean  # noqa: E402
-from steps.conflicts import find_conflicts  # noqa: E402
-from steps.index import EMBEDDINGS, build_index, fingerprint, index_docs  # noqa: E402
-from steps.load import to_documents  # noqa: E402
-from steps.rates import rate_table  # noqa: E402
-from steps.search import Keywords, fuse, newest_effective_first, rerank  # noqa: E402
-from steps.split import split_into_chunks  # noqa: E402
+from contract import Answer, Snapshot  # noqa: E402
+from find_conflicts import find_conflicts, rate_table  # noqa: E402
+from generation.ask_the_llm import GAPS, LLMS, ask_the_llm  # noqa: E402
+from generation.write_the_prompt import write_the_prompt  # noqa: E402
+from indexing.clean_pages import clean_pages  # noqa: E402
+from indexing.index_chunks import EMBEDDINGS, Keywords, build_index, fingerprint, index_docs  # noqa: E402
+from indexing.load_pages import load_pages  # noqa: E402
+from indexing.split_into_chunks import split_into_chunks  # noqa: E402
+from retrieval.keep_top_k import keep_top_k  # noqa: E402
+from retrieval.reorder_by_date import reorder_by_date  # noqa: E402
+from retrieval.rerank_chunks import rerank_chunks  # noqa: E402
+from retrieval.retrieve_chunks import retrieve_chunks  # noqa: E402
 
 INDEX_DIR = Path(__file__).resolve().parents[1] / "index"
-SPLITS = {"sections": split_into_chunks}
-SEARCHES = ("vectors + bm25", "vectors", "bm25", "vectors + bm25 + rerank")
+DONT_KNOW = "I don't know. The Dupaco website does not say this. Please contact Dupaco and a member services rep can help."
 CONFIG = {
     "clean": [
         "images",
@@ -29,16 +31,14 @@ CONFIG = {
         "empty_pages",
         "copies",
     ],
-    "split": "sections",
     "chunk_size": 4000,
     "embedding": "bge-m3",
     "search": "vectors + bm25 + rerank",
     "candidates": 20,
     "top_k": 5,
-    "llm": "gcp:qwen3:30b-a3b",
-    "prompt": "closest",
-    "sources": "with_value",
     "dates": "newest effective first",
+    "prompt": "plain",
+    "llm": "gcp:qwen3:32b",
 }
 
 
@@ -54,10 +54,10 @@ class Knowledge:
 
     def ingest(self, snapshot: Snapshot):
         c = self.config
-        loaded = to_documents(snapshot)
-        self.rates += rate_table(loaded)
-        cleaned = clean(loaded, c["clean"])
-        chunks = SPLITS[c["split"]](cleaned, c["chunk_size"])
+        pages = load_pages(snapshot)
+        self.rates += rate_table(pages)
+        cleaned = clean_pages(pages, c["clean"])
+        chunks = split_into_chunks(cleaned, c["chunk_size"])
         docs = index_docs(chunks)
         name = f"{snapshot.snapshot_id}__{c['embedding']}__{fingerprint(docs)}"
         store, how = build_index(docs, name, self.embeddings, INDEX_DIR)
@@ -65,44 +65,31 @@ class Knowledge:
         self.keywords[snapshot.snapshot_id] = Keywords(docs)
         self.dates[snapshot.snapshot_id] = snapshot.taken_on
         print(
-            f"{snapshot.snapshot_id}: {len(loaded)} pages loaded, "
+            f"{snapshot.snapshot_id}: {len(pages)} pages loaded, "
             f"{len(cleaned)} after cleaning, {len(chunks)} chunks, index {how}"
         )
-
-    def search(self, question, snapshot_id):
-        c = self.config
-        lists = []
-        if "vectors" in c["search"]:
-            lists.append(self.stores[snapshot_id].similarity_search(question, k=c["candidates"]))
-        if "bm25" in c["search"]:
-            lists.append(self.keywords[snapshot_id].search(question, c["candidates"]))
-        found = fuse(lists)
-        if "rerank" in c["search"]:
-            found = rerank(question, found)
-        found = found[: c["top_k"]]
-        if c.get("dates") == "newest effective first":
-            found = newest_effective_first(found)
-        return found
 
     def pick(self, as_of):
         days = {sid: day for sid, day in self.dates.items() if as_of is None or day <= as_of}
         return max(days, key=days.get) if days else min(self.dates, key=self.dates.get)
 
+    def search(self, question, snapshot_id):
+        c = self.config
+        chunks = retrieve_chunks(self.stores[snapshot_id], self.keywords[snapshot_id], question, c["candidates"], c["search"])
+        if "rerank" in c["search"]:
+            chunks = rerank_chunks(question, chunks)
+        chunks = keep_top_k(chunks, c["top_k"])
+        if c["dates"] == "newest effective first":
+            chunks = reorder_by_date(chunks)
+        return chunks
+
     def answer(self, question, as_of=None):
-        snapshot_id = self.pick(as_of)
-        chunks = self.search(question, snapshot_id)
-        order = self.config.get("excerpts", "score")
-        if order == "newest":
-            chunks = sorted(chunks, key=lambda c: c.metadata.get("published") or c.metadata["taken_on"], reverse=True)
-        reply = ask(self.llm, GAPS[self.config["llm"]], self.config["prompt"], question, chunks, self.dates[snapshot_id], order)
+        chunks = self.search(question, self.pick(as_of))
+        prompt = write_the_prompt(self.config["prompt"], question, chunks)
+        reply = ask_the_llm(self.llm, GAPS[self.config["llm"]], prompt)
         if not reply.known:
             return Answer(text=DONT_KNOW, confident=False)
-        used = chunks[reply.source - 1] if 1 <= reply.source <= len(chunks) else chunks[0]
-        urls = [used.metadata["url"]]
-        if self.config.get("sources") == "with_value":
-            pages = [(c.metadata["url"], c.metadata["url"] + "\n" + c.page_content) for c in chunks]
-            urls = list(dict.fromkeys(urls + with_value(reply.answer, pages)))
-        return Answer(text=reply.answer, sources=[Source(url=u, snapshot_id=snapshot_id) for u in urls])
+        return Answer(text=reply.answer)
 
     def conflicts(self):
         return find_conflicts(self.rates)

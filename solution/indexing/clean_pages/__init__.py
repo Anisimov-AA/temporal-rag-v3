@@ -1,14 +1,14 @@
 from langchain_core.documents import Document
-from steps.clean.blocks import remove_blocks
-from steps.clean.inline import (
+from indexing.clean_pages.blocks import remove_blocks
+from indexing.clean_pages.inline import (
     links_to_text,
     remove_html_noise,
     remove_images,
     remove_markdown_noise,
 )
-from steps.clean.pages import drop_app_pages, drop_copies, drop_empty_pages, move_head
-from steps.clean.repeated_lines import remove_repeated_lines
-from steps.clean.tidy import tidy
+from indexing.clean_pages.pages import drop_app_pages, drop_copies, drop_empty_pages, move_head
+from indexing.clean_pages.repeated_lines import remove_repeated_lines
+from indexing.clean_pages.tidy import tidy
 
 
 def each_page(fix):
@@ -36,7 +36,7 @@ CLEANERS = {
 }
 
 
-def clean(docs, names):
+def clean_pages(docs, names):
     for name in names:
         docs = CLEANERS[name](docs)
     return docs
