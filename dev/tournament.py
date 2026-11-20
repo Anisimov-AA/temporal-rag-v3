@@ -40,7 +40,7 @@ for _prefix, (_prompt, _, _) in STEP4.items():
 SETTINGS = {"s6_base": {}, "s6_cap150": {"num_predict": 150}, "s6_think": {"reasoning": True},
             "s6b_base": {}, "s6b_cap150": {"max_tokens": 150},
             "s6b_think": {"max_tokens": 4096, "extra_body": {"chat_template_kwargs": {"enable_thinking": True}}},
-            "t_k10_on_ctx16": {"num_ctx": 16384}}
+            "t_k10_on_ctx16": {"num_ctx": 16384}, "t_neighbors": {"num_ctx": 12288}}
 THINK = re.compile(r"<think>.*?</think>", re.S)
 if VARIANT.startswith("f_"):
     VARIANTS[VARIANT] = {"prompt": VARIANT[2:]}
