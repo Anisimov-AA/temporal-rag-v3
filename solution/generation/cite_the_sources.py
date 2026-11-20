@@ -5,6 +5,8 @@ MAX_SOURCES = 8
 
 
 def cite_the_sources(chunks, pages):
+    if not pages:
+        pages = range(1, len(chunks) + 1)
     cited = [chunks[p - 1] for p in pages if 1 <= p <= len(chunks)]
     sources, urls = [], []
     for chunk in cited + list(chunks):

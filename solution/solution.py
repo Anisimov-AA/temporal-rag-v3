@@ -40,7 +40,7 @@ CONFIG = {
     "candidates": 20,
     "top_k": 5,
     "dates": "newest effective first",
-    "prompt": "json_known_pages",
+    "prompt": "json_known",
     "llm": "gcp:gemma4:26b",
 }
 
