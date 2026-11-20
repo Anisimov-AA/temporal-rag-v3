@@ -71,6 +71,12 @@ class Knowledge:
             f"{snapshot.snapshot_id}: {len(pages)} pages loaded, "
             f"{len(cleaned)} after cleaning, {len(chunks)} chunks, index {how}"
         )
+        self.warm_up(store, docs)
+
+    def warm_up(self, store, docs):
+        store.similarity_search("warm up", k=1)
+        rerank_chunks("warm up", docs[:2])
+        self.llm.invoke("Reply OK")
 
     def pick(self, as_of):
         days = {sid: day for sid, day in self.dates.items() if as_of is None or day <= as_of}
