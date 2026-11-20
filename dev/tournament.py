@@ -10,14 +10,48 @@ sys.path[:0] = [str(ROOT / "harness"), str(ROOT / "solution")]
 import solution  # noqa: E402
 from contract import Answer  # noqa: E402
 from scoring import score_item  # noqa: E402
-from generation.ask_the_llm import GAPS, LLMS, Reply, parse_reply  # noqa: E402
-from generation.write_the_prompt import write_the_prompt  # noqa: E402
+from generation.ask_the_llm import GAPS, LLMS, Reply, parse_reply, reply_text  # noqa: E402
+from generation.write_the_prompt import FORMATS, write_the_prompt  # noqa: E402
 from solution import DONT_KNOW  # noqa: E402
 
 QUESTIONS = ROOT / "eval" / "public_eval.jsonl"
 SPLIT = ROOT / "dev" / "split.json"
-VARIANTS = {"step2": {}}
+VARIANTS = {"step0json": {"prompt": "plain"}, "step0known": {"prompt": "plain_known"}, "step0reason": {"prompt": "plain_reason"}, "step0text": {"prompt": "plain_text"}, "step2": {}}
+for _p in ("plain", "plain_text", "plain_known", "plain_reason"):
+    for _k in (3, 5, 10, 15):
+        for _d, _rule in (("on", "newest effective first"), ("off", "none")):
+            VARIANTS[f"s2_{_p}_k{_k}_{_d}"] = {"prompt": _p, "top_k": _k, "dates": _rule}
+KNOWN_LINE = 'If the excerpts do not answer the question, set "known" to false.\n'
+RULES = {"A": 'If the excerpts do not state the exact value asked for, set "known" to false.',
+         "B": "If excerpts disagree, use the newest one and do not mention older values.",
+         "C": "Include the exact figures from the excerpts: rates, times, amounts.",
+         "D": "Answer in one or two clear sentences, with the value first.",
+         "E": "Use the value whose product, term and tier match the question exactly.",
+         "F": 'Examples:\nQuestion: What is the late fee on a personal loan? -> {"answer": "The late fee is $25.", "known": true}\n'
+              'Question: Do you offer pet insurance? (the excerpts never mention it) -> {"answer": "", "known": false}'}
+QUESTION = re.compile(r"\nMember question: [^\n]*\n")
+ROLE_END = "You answer only from the website excerpts you are given.\n"
+TEXT_LINE = "If the excerpts do not answer the question, reply exactly: I don't know.\n"
+STEP4 = {"s4_": ("plain_known", "step0known", KNOWN_LINE), "s4b_": ("plain", "step0json", ROLE_END), "s4o_": ("plain_text", "step0text", TEXT_LINE)}
 VARIANT = os.getenv("VARIANT", "step2")
+for _prefix, (_prompt, _, _) in STEP4.items():
+    if VARIANT.startswith(_prefix):
+        VARIANTS[VARIANT] = {"prompt": _prompt}
+SETTINGS = {"s6_base": {}, "s6_cap150": {"num_predict": 150}, "s6_think": {"reasoning": True},
+            "s6b_base": {}, "s6b_cap150": {"max_tokens": 150},
+            "s6b_think": {"max_tokens": 4096, "extra_body": {"chat_template_kwargs": {"enable_thinking": True}}},
+            "t_k10_on_ctx16": {"num_ctx": 16384}}
+THINK = re.compile(r"<think>.*?</think>", re.S)
+if VARIANT.startswith("f_"):
+    VARIANTS[VARIANT] = {"prompt": VARIANT[2:]}
+if VARIANT.startswith("t_"):
+    VARIANTS[VARIANT] = {"prompt": "json_known"}
+if VARIANT == "s9_clear":
+    VARIANTS[VARIANT] = {"prompt": "json_known_pages"}
+if VARIANT == "s8_versions":
+    VARIANTS[VARIANT] = {"prompt": "json_known_pages", "old_versions": "drop"}
+if VARIANT in SETTINGS or VARIANT == "s7_pages":
+    VARIANTS[VARIANT] = {"prompt": "json" if VARIANT.startswith("s6b_") else "json_known"}
 OUT = ROOT / "results" / "tournament" / "variants" / VARIANT
 CONTEXTS = OUT / "contexts.json"
 CONFIG = {**solution.CONFIG, **VARIANTS[VARIANT]}
@@ -35,7 +69,7 @@ def questions():
 def contexts():
     from run_eval import load_snapshots
 
-    k = solution.build({**CONFIG, "llm": "gemini-3.5-flash-lite"})
+    k = solution.build(CONFIG)
     for snapshot in load_snapshots(ROOT / "snapshots"):
         k.ingest(snapshot)
     items = []
@@ -48,6 +82,22 @@ def contexts():
     OUT.mkdir(parents=True, exist_ok=True)
     CONTEXTS.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
     print(len(items), "prompts saved")
+
+
+def rules():
+    prefix, combo = VARIANT.split("_", 1)
+    _, base, anchor = STEP4[prefix + "_"]
+    lines = "".join(RULES[name] + "\n" for name in combo if name in RULES)
+    items = json.loads((OUT.parent / base / "contexts.json").read_text(encoding="utf-8"))
+    for c in items:
+        assert c["prompt"].count(anchor) == 1
+        c["prompt"] = c["prompt"].replace(anchor, anchor + lines)
+        if "G" in combo:
+            question = QUESTION.search(c["prompt"]).group(0)
+            c["prompt"] = c["prompt"].replace(question, "\n").replace("\nWebsite excerpts:", question + "\nWebsite excerpts:", 1)
+    OUT.mkdir(parents=True, exist_ok=True)
+    CONTEXTS.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(len(items), "prompts with rules", combo, "on", base)
 
 
 def load_contexts():
@@ -79,6 +129,8 @@ def warm_up(llm, tries=5):
 
 def run(model, runs="3", first="1"):
     llm = LLMS[model]()
+    if VARIANT in SETTINGS:
+        llm = llm.model_copy(update=SETTINGS[VARIANT])
     gap = GAPS[model]
     folder = OUT / model.replace(":", "_")
     folder.mkdir(parents=True, exist_ok=True)
@@ -91,8 +143,9 @@ def run(model, runs="3", first="1"):
             start = last = time.time()
             try:
                 message = llm.invoke(c["prompt"])
-                r = parse_reply(message.content)
-                lines.append({"id": c["id"], "raw": message.content, "reply": r.model_dump(), "seconds": round(time.time() - start, 1),
+                raw = THINK.sub("", reply_text(message)).strip()
+                r = parse_reply(raw, FORMATS[CONFIG["prompt"]])
+                lines.append({"id": c["id"], "raw": raw, "reply": r.model_dump(), "seconds": round(time.time() - start, 1),
                               "model_seconds": model_seconds(message)})
             except Exception as error:
                 lines.append({"id": c["id"], "error": str(error)[:200], "seconds": round(time.time() - start, 1)})
@@ -180,4 +233,4 @@ def score():
 
 if __name__ == "__main__":
     command, args = sys.argv[1], sys.argv[2:]
-    {"contexts": contexts, "run": run, "speed": speed, "agent_prompts": agent_prompts, "score": score}[command](*args)
+    {"contexts": contexts, "rules": rules, "run": run, "speed": speed, "agent_prompts": agent_prompts, "score": score}[command](*args)
