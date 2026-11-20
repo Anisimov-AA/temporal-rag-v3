@@ -44,6 +44,8 @@ SETTINGS = {"s6_base": {}, "s6_cap150": {"num_predict": 150}, "s6_think": {"reas
 THINK = re.compile(r"<think>.*?</think>", re.S)
 if VARIANT.startswith("f_"):
     VARIANTS[VARIANT] = {"prompt": VARIANT[2:]}
+if VARIANT.startswith("o_json"):
+    VARIANTS[VARIANT] = {"prompt": "json"}
 if VARIANT.startswith("t_"):
     VARIANTS[VARIANT] = {"prompt": "json_known"}
 if VARIANT == "s9_clear":
