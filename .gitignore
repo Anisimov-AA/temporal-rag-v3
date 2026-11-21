@@ -1,6 +1,5 @@
 # everything kept local
 archive/
-demo/
 
 # must never be pushed: keys, the Python env, the site data and what is built from it
 .env

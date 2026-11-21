@@ -1,0 +1,6 @@
+*
+!harness/
+!solution/
+!demo/app.py
+!demo/requirements.txt
+**/__pycache__
