@@ -13,13 +13,16 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 GCP = os.getenv("GCP_OLLAMA", "http://localhost:11435")
 THREADS = int(os.getenv("OLLAMA_THREADS", "0")) or None
 
-GAPS = {"gcp:gemma4:26b": 0, "gcp:qwen3:30b-a3b": 0, "gcp:gemma4:31b-qat": 0, "gcp:qwen3.6:27b": 0, "gcp:qwen3:32b": 0}
+GAPS = {"gcp:gemma4:26b": 0, "gcp:qwen3:30b-a3b": 0, "gcp:gemma4:31b-qat": 0, "gcp:qwen3.6:27b": 0, "gcp:qwen3:32b": 0, "gcp:gemma4:26b-q8": 0, "gcp:gemma4:31b-q8": 0, "gcp:qwen3.6:27b-q8": 0}
 LLMS = {
     "gcp:gemma4:26b": lambda: ChatOllama(model="gemma4:26b-a4b-it-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
     "gcp:qwen3:30b-a3b": lambda: ChatOllama(model="qwen3:30b-a3b-instruct-2507-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024),
     "gcp:gemma4:31b-qat": lambda: ChatOllama(model="gemma4:31b-it-qat", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
     "gcp:qwen3:32b": lambda: ChatOllama(model="qwen3:32b", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
     "gcp:qwen3.6:27b": lambda: ChatOllama(model="qwen3.6:27b-q4_K_M", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
+    "gcp:gemma4:26b-q8": lambda: ChatOllama(model="gemma4:26b-a4b-it-q8_0", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
+    "gcp:gemma4:31b-q8": lambda: ChatOllama(model="gemma4:31b-it-q8_0", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
+    "gcp:qwen3.6:27b-q8": lambda: ChatOllama(model="qwen3.6:27b-q8_0", base_url=GCP, temperature=0, seed=42, num_thread=THREADS, num_ctx=8192, num_predict=1024, reasoning=False),
 }
 
 
