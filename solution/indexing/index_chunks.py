@@ -11,6 +11,9 @@ BATCH = 64
 EMBEDDINGS = {
     "bge-m3": lambda: OllamaEmbeddings(model="bge-m3", num_ctx=8192),
 }
+QUERY_EMBEDDINGS = {
+    "bge-m3": lambda: OllamaEmbeddings(model="bge-m3", num_ctx=8192, num_gpu=0),
+}
 
 
 def search_text(chunk):
@@ -58,6 +61,10 @@ def build_index(docs, name, embeddings, folder):
     for start in range(0, len(docs), BATCH):
         store.add_documents(docs[start : start + BATCH], ids=ids[start : start + BATCH])
     return store, "built"
+
+
+def open_index(name, embeddings, folder):
+    return Chroma(collection_name=name, embedding_function=embeddings, persist_directory=str(folder))
 
 
 WORD = re.compile(r"[a-z0-9]+(?:\.[0-9]+)?")

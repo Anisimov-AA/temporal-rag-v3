@@ -9,7 +9,7 @@ from generation.check_the_answer import check_the_answer  # noqa: E402
 from generation.cite_the_sources import cite_the_sources  # noqa: E402
 from generation.write_the_prompt import FORMATS, write_the_prompt  # noqa: E402
 from indexing.clean_pages import clean_pages  # noqa: E402
-from indexing.index_chunks import EMBEDDINGS, Keywords, build_index, fingerprint, index_docs  # noqa: E402
+from indexing.index_chunks import EMBEDDINGS, QUERY_EMBEDDINGS, Keywords, build_index, fingerprint, index_docs, open_index  # noqa: E402
 from indexing.load_pages import load_pages  # noqa: E402
 from indexing.split_into_chunks import split_into_chunks  # noqa: E402
 from retrieval.drop_old_versions import drop_old_versions  # noqa: E402
@@ -49,6 +49,7 @@ class Knowledge:
     def __init__(self, config=None):
         self.config = config or CONFIG
         self.embeddings = EMBEDDINGS[self.config["embedding"]]()
+        self.query_embeddings = QUERY_EMBEDDINGS[self.config["embedding"]]()
         self.llm = LLMS[self.config["llm"]]()
         self.stores = {}
         self.keywords = {}
@@ -63,7 +64,8 @@ class Knowledge:
         chunks = split_into_chunks(cleaned, c["chunk_size"])
         docs = index_docs(chunks)
         name = f"{snapshot.snapshot_id}__{c['embedding']}__{fingerprint(docs)}"
-        store, how = build_index(docs, name, self.embeddings, INDEX_DIR)
+        _, how = build_index(docs, name, self.embeddings, INDEX_DIR)
+        store = open_index(name, self.query_embeddings, INDEX_DIR)
         self.stores[snapshot.snapshot_id] = store
         self.keywords[snapshot.snapshot_id] = Keywords(docs)
         self.dates[snapshot.snapshot_id] = snapshot.taken_on
