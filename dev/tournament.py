@@ -11,6 +11,7 @@ import solution  # noqa: E402
 from contract import Answer  # noqa: E402
 from scoring import score_item  # noqa: E402
 from generation.ask_the_llm import GAPS, LLMS, Reply, parse_reply, reply_text  # noqa: E402
+import api_llms  # noqa: E402,F401
 from generation.write_the_prompt import FORMATS, write_the_prompt  # noqa: E402
 from solution import DONT_KNOW  # noqa: E402
 
