@@ -6,5 +6,6 @@ archive/
 .venv/
 __pycache__/
 snapshots/0*/
+snapshots_zip/
 index/
 results/
