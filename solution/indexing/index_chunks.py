@@ -8,11 +8,28 @@ from langchain_ollama import OllamaEmbeddings
 from rank_bm25 import BM25Okapi
 
 BATCH = 64
+GEMMA_QUERY = "task: search result | query: "
+GEMMA_DOC = "title: none | text: "
+
+
+class Prefixed(OllamaEmbeddings):
+    query_prefix: str = ""
+    doc_prefix: str = ""
+
+    def embed_query(self, text):
+        return super().embed_query(self.query_prefix + text)
+
+    def embed_documents(self, texts):
+        return super().embed_documents([self.doc_prefix + text for text in texts])
+
+
 EMBEDDINGS = {
     "bge-m3": lambda: OllamaEmbeddings(model="bge-m3", num_ctx=8192),
+    "embeddinggemma": lambda: Prefixed(model="embeddinggemma", num_ctx=2048, query_prefix=GEMMA_QUERY, doc_prefix=GEMMA_DOC),
 }
 QUERY_EMBEDDINGS = {
     "bge-m3": lambda: OllamaEmbeddings(model="bge-m3", num_ctx=8192, num_gpu=0),
+    "embeddinggemma": lambda: Prefixed(model="embeddinggemma", num_ctx=2048, num_gpu=0, query_prefix=GEMMA_QUERY, doc_prefix=GEMMA_DOC),
 }
 
 
@@ -50,6 +67,11 @@ def index_docs(chunks):
     for doc, doc_id in zip(docs, doc_ids(docs)):
         doc.id = doc_id
     return docs
+
+
+def index_is_ready(docs, name, embeddings, folder):
+    store = Chroma(collection_name=name, embedding_function=embeddings, persist_directory=str(folder))
+    return set(store.get(include=[])["ids"]) == {doc.id for doc in docs}
 
 
 def build_index(docs, name, embeddings, folder):
