@@ -2,7 +2,7 @@
 
 A chatbot that answers member questions from 5 dated downloads of a credit union website. It picks the right download for "now" or "as of" questions, puts the newest facts first, cites its sources, and says "I don't know" when the site does not say.
 
-**Experiments:** [the map of every step I tried and its results](https://anisimov-aa.github.io/temporal-rag-v3/config.html). The pipeline pages and the answers pages open from there.
+**Experiments:** [the map of every step I tried and its results](https://anisimov-aa.github.io/temporal-rag-website-qa/config.html). The pipeline pages and the answers pages open from there.
 
 The task is in [TASK.md](TASK.md).
 
@@ -32,8 +32,8 @@ If the installer already started Ollama as a service, stop it first (`sudo syste
 
 **3. Python 3.11 and the packages.**
 
-    git clone https://github.com/Anisimov-AA/temporal-rag-v3.git
-    cd temporal-rag-v3
+    git clone https://github.com/Anisimov-AA/temporal-rag-website-qa.git
+    cd temporal-rag-website-qa
     curl -LsSf https://astral.sh/uv/install.sh | sh
     uv venv --python 3.11 && source .venv/bin/activate
     uv pip install torch --index-url https://download.pytorch.org/whl/cu128
