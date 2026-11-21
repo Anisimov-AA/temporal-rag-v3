@@ -1,15 +1,17 @@
 import sys
 from pathlib import Path
 
+from ollama import Client
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "harness"))
 from contract import Answer, Snapshot  # noqa: E402
 from find_conflicts import find_conflicts, rate_table  # noqa: E402
 from generation.ask_the_llm import GAPS, LLMS, ask_the_llm  # noqa: E402
 from generation.check_the_answer import check_the_answer  # noqa: E402
 from generation.cite_the_sources import cite_the_sources  # noqa: E402
-from generation.write_the_prompt import FORMATS, write_the_prompt  # noqa: E402
+from generation.write_the_prompt import FORMATS, RETRY, write_the_prompt  # noqa: E402
 from indexing.clean_pages import clean_pages  # noqa: E402
-from indexing.index_chunks import EMBEDDINGS, QUERY_EMBEDDINGS, Keywords, build_index, fingerprint, index_docs, open_index  # noqa: E402
+from indexing.index_chunks import EMBEDDINGS, QUERY_EMBEDDINGS, Keywords, build_index, fingerprint, index_docs, index_is_ready, open_index  # noqa: E402
 from indexing.load_pages import load_pages  # noqa: E402
 from indexing.split_into_chunks import split_into_chunks  # noqa: E402
 from retrieval.drop_old_versions import drop_old_versions  # noqa: E402
@@ -64,6 +66,8 @@ class Knowledge:
         chunks = split_into_chunks(cleaned, c["chunk_size"])
         docs = index_docs(chunks)
         name = f"{snapshot.snapshot_id}__{c['embedding']}__{fingerprint(docs)}"
+        if not index_is_ready(docs, name, self.embeddings, INDEX_DIR):
+            self.free_the_gpu()
         _, how = build_index(docs, name, self.embeddings, INDEX_DIR)
         store = open_index(name, self.query_embeddings, INDEX_DIR)
         self.stores[snapshot.snapshot_id] = store
@@ -74,6 +78,9 @@ class Knowledge:
             f"{len(cleaned)} after cleaning, {len(chunks)} chunks, index {how}"
         )
         self.warm_up(store, docs)
+
+    def free_the_gpu(self):
+        Client(host=self.llm.base_url).generate(model=self.llm.model, keep_alive=0)
 
     def warm_up(self, store, docs):
         store.similarity_search("warm up", k=1)
@@ -97,9 +104,14 @@ class Knowledge:
         return chunks
 
     def answer(self, question, as_of=None):
-        chunks = self.search(question, self.pick(as_of))
-        prompt = write_the_prompt(self.config["prompt"], question, chunks)
-        reply = ask_the_llm(self.llm, GAPS[self.config["llm"]], prompt, FORMATS[self.config["prompt"]])
+        c = self.config
+        snapshot_id = self.pick(as_of)
+        chunks = self.search(question, snapshot_id)
+        today = (as_of or self.dates[snapshot_id]) if c.get("today") else None
+        prompt = write_the_prompt(c["prompt"], question, chunks, today, c.get("url_in_body", False))
+        reply = ask_the_llm(self.llm, GAPS[c["llm"]], prompt, FORMATS[c["prompt"]])
+        if c.get("retry") and not reply.known:
+            reply = ask_the_llm(self.llm, GAPS[c["llm"]], prompt + RETRY, FORMATS[c["prompt"]])
         reply = check_the_answer(question, reply)
         if not reply.known:
             return Answer(text=DONT_KNOW, confident=False)
